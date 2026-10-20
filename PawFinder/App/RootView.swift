@@ -3,6 +3,7 @@ import SwiftUI
 /// The tab bar. Each tab has its own NavigationStack driven by the Router.
 struct RootView: View {
     @Environment(Router.self) private var router
+    @Environment(MessagesStore.self) private var messages
 
     var body: some View {
         @Bindable var router = router
@@ -17,6 +18,8 @@ struct RootView: View {
                 }
                 .tabItem { Label(tab.title, systemImage: tab.icon) }
                 .tag(tab)
+                // Unread messages live under Profile.
+                .badge(tab == .profile ? messages.unreadCount : 0)
             }
         }
     }
@@ -32,4 +35,6 @@ struct RootView: View {
         .environment(AuthManager())
         .environment(ProfileStore())
         .environment(ApplicationsStore())
+        .environment(MessagesStore())
+        .environment(NetworkMonitor())
 }

@@ -11,6 +11,8 @@ struct PawFinderApp: App {
     @State private var auth: AuthManager
     @State private var profileStore = ProfileStore()
     @State private var applications = ApplicationsStore()
+    @State private var messages = MessagesStore()
+    @State private var network = NetworkMonitor()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
@@ -46,6 +48,12 @@ struct PawFinderApp: App {
                 .environment(auth)
                 .environment(profileStore)
                 .environment(applications)
+                .environment(messages)
+                .environment(network)
+                // Send messages that were written offline.
+                .onChange(of: network.isOnline) { _, isOnline in
+                    if isOnline { messages.flushOutbox() }
+                }
                 .environment(recentlyViewed)
                 .environment(favorites)
                 .environment(locationService)
@@ -64,7 +72,10 @@ struct PawFinderApp: App {
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .background: BackgroundRefresh.schedule()
-            case .active: applications.refresh()   // apply any simulated shelter replies
+            case .active:
+                // Apply any simulated shelter replies that came due.
+                applications.refresh()
+                messages.refresh()
             default: break
             }
         }
@@ -82,5 +93,6 @@ struct PawFinderApp: App {
         let arrivals = await followedShelters.checkNewArrivals(using: petRepository)
         await NotificationManager.shared.notifyNewArrivals(arrivals)
         applications.refresh()
+        messages.refresh()
     }
 }

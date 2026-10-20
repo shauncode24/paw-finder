@@ -56,6 +56,10 @@ struct RouteView: View {
             ApplicationFormView(applicationID: id)
         case .applicationDetail(let id):
             ApplicationDetailView(applicationID: id)
+        case .messages:
+            ConversationsListView()
+        case .conversation(let id):
+            ChatView(conversationID: id)
         case .designSystem:
             DesignSystemPreviewView()
         }

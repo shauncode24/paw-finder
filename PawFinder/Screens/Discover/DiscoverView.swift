@@ -243,4 +243,5 @@ struct DiscoverView: View {
     .environment(AuthManager())
     .environment(ProfileStore())
     .environment(ApplicationsStore())
+    .environment(MessagesStore())
 }

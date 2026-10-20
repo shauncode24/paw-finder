@@ -12,6 +12,7 @@ struct PetDetailView: View {
     @Environment(ProfileStore.self) private var profileStore
     @Environment(AuthManager.self) private var auth
     @Environment(Router.self) private var router
+    @Environment(MessagesStore.self) private var messages
 
     private var pet: Pet { viewModel.pet }
 
@@ -28,6 +29,7 @@ struct PetDetailView: View {
                     statusBanner
                     header
                     applyButton
+                    PFButton(title: "Message shelter", style: .secondary) { openChat() }
                     attributeChips
                     if favorites.isFavorite(pet.id) {
                         FavoriteNotesSection(pet: pet)
@@ -118,6 +120,13 @@ struct PetDetailView: View {
                 router.push(.applicationForm(id))
             }
         }
+    }
+
+    private func openChat() {
+        var shelterName = "Shelter"
+        if case .loaded(let shelter) = viewModel.shelterState { shelterName = shelter.name }
+        let id = messages.startConversation(shelterID: pet.shelterID, shelterName: shelterName, pet: pet)
+        router.push(.conversation(id))
     }
 
     /// Shown when a saved pet was adopted or removed from Petfinder.
@@ -272,4 +281,5 @@ struct PetDetailView: View {
     .environment(ProfileStore())
     .environment(ApplicationsStore())
     .environment(Router())
+    .environment(MessagesStore())
 }

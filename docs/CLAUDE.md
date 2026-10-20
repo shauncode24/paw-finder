@@ -5,7 +5,7 @@ Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list 
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
 ## Current phase
-Phase 9 done; Phases 6 (Core ML) and 8 (cloud sync) skipped for now (update this line as phases complete)
+Phase 10 done; Phases 6 (Core ML) and 8 (cloud sync) skipped for now (update this line as phases complete)
 
 ## Setup
 - One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, `Models/`, `Services/`.
@@ -28,6 +28,7 @@ Phase 9 done; Phases 6 (Core ML) and 8 (cloud sync) skipped for now (update this
 - Shelters (`Screens/Map/`, `Screens/Shelters/`): `ShelterMapView` + `ShelterMapViewModel` (search by GPS/ZIP/"Search this area", grid clustering via `ShelterCluster`, list mode). `ShelterProfileView` (`Route.shelter(id:)`). `ShelterGeocoder.shared` turns addresses into coordinates with a disk cache (Petfinder has no coordinates). `FollowedSheltersStore` (environment) + background check for new arrivals. Reusable: `ShelterMiniMap`, `ContactButtons`, `OpenStatusLabel`, `MapsLink`. `Shelter.openStatus()` reads free-text hours.
 - Accounts (`Screens/Account/`, `Screens/Onboarding/`): `AuthManager` (environment) wraps Firebase Auth: email **or username** + password (usernames map to `<name>@users.pawfinder.app`) and Sign in with Apple (capability off until there's a paid account). `ProfileStore` (environment) keeps one `AdopterProfile` (name, lifestyle answers) + avatar per user on the device, and moves the guest profile to the account on first sign-in. `OnboardingView` shows once (`@AppStorage("hasCompletedOnboarding")`). `AccountView` has sign out, export (`DataExporter`), and delete (re-auth first).
 - Applications (`Screens/Applications/`): `ApplicationsStore` (environment) saves `AdoptionApplication`s to `Documents/applications.json` (attachments in `Documents/ApplicationFiles/<id>/`). Drafts autosave. A **simulated shelter** plans status replies on submit (`scheduledEvents`), applied by `refresh()` (on launch, foreground, background task, and every 10s on the detail screen); matching local notifications are scheduled by `NotificationManager.scheduleApplicationUpdates`. Routes: `.applications`, `.applicationForm(id)`, `.applicationDetail(id)`; deep link `pawfinder://application/<uuid>`.
+- Messages (`Screens/Messages/`): `MessagesStore` (environment) saves `Conversation`s to `Documents/messages.json` (photos in `Documents/MessageFiles/`). A **simulated shelter** plans a keyword-based reply on send (`pendingReplies`), applied by `refresh()`; local notification via `NotificationManager.scheduleMessageReply` (suppressed for the open chat via `openConversationID`). `NetworkMonitor` (environment) drives the offline outbox (`flushOutbox()`). `ContentModerator` checks outgoing text. Unread count badges the Profile tab. Routes `.messages`, `.conversation(id)`; deep link `pawfinder://conversation/<uuid>`.
 - For now and later phases: **no server, no cloud, no tests.** Firebase Auth (already in) is the only cloud piece. Anything cloud-related goes to docs/Leftover.md marked *(cloud)*.
 
 ## Rules

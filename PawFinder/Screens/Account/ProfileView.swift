@@ -6,6 +6,7 @@ struct ProfileView: View {
     @Environment(AuthManager.self) private var auth
     @Environment(ProfileStore.self) private var profileStore
     @Environment(ApplicationsStore.self) private var applications
+    @Environment(MessagesStore.self) private var messages
     @State private var showAuth = false
 
     var body: some View {
@@ -41,6 +42,21 @@ struct ProfileView: View {
             .listRowBackground(Color.pfSurface)
 
             Section {
+                NavigationLink(value: Route.messages) {
+                    HStack {
+                        Label("Messages", systemImage: "bubble.left.and.bubble.right")
+                        Spacer()
+                        if messages.unreadCount > 0 {
+                            Text("\(messages.unreadCount)")
+                                .font(.pfCaption.weight(.bold))
+                                .foregroundStyle(Color.pfSurfaceElevated)
+                                .padding(.horizontal, Spacing.sm)
+                                .padding(.vertical, 2)
+                                .background(Color.pfBrandPrimary, in: Capsule())
+                                .accessibilityLabel("\(messages.unreadCount) unread")
+                        }
+                    }
+                }
                 NavigationLink(value: Route.applications) {
                     HStack {
                         Label("My applications", systemImage: "doc.text")

@@ -7,6 +7,8 @@ struct ShelterProfileView: View {
     @State private var isAboutExpanded = false
     @Environment(FollowedSheltersStore.self) private var followed
     @Environment(LocationService.self) private var locationService
+    @Environment(MessagesStore.self) private var messages
+    @Environment(Router.self) private var router
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: Spacing.md)]
 
@@ -38,6 +40,10 @@ struct ShelterProfileView: View {
                 VStack(alignment: .leading, spacing: Spacing.xl) {
                     titleBlock(shelter)
                     followButton(shelter)
+                    PFButton(title: "Message \(shelter.name)", style: .secondary) {
+                        let id = messages.startConversation(shelterID: shelter.id, shelterName: shelter.name, pet: nil)
+                        router.push(.conversation(id))
+                    }
                     ContactButtons(phone: shelter.phone, email: shelter.email,
                                    website: shelter.website ?? shelter.petfinderURL)
 
@@ -219,4 +225,6 @@ struct ShelterProfileView: View {
     .environment(FollowedSheltersStore())
     .environment(LocationService())
     .environment(FavoritesStore(fileName: "preview-favorites.json"))
+    .environment(MessagesStore())
+    .environment(Router())
 }

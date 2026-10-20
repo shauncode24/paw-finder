@@ -36,6 +36,8 @@ enum Route: Hashable {
     case applications
     case applicationForm(UUID)
     case applicationDetail(UUID)
+    case messages
+    case conversation(UUID)
     case settings
     case designSystem
 }
@@ -73,6 +75,7 @@ final class Router {
     ///     pawfinder://pet/12345      a pet
     ///     pawfinder://shelter/NJ333  a shelter profile
     ///     pawfinder://application/<uuid>  an adoption application
+    ///     pawfinder://conversation/<uuid> a chat with a shelter
     ///     pawfinder://favorites      a tab (discover, map, identify, favorites, profile)
     ///     pawfinder://settings       the Settings screen
     ///
@@ -92,6 +95,9 @@ final class Router {
         case "application":
             guard let argument, let id = UUID(uuidString: argument) else { return false }
             open(.applicationDetail(id), in: .profile)
+        case "conversation":
+            guard let argument, let id = UUID(uuidString: argument) else { return false }
+            open(.conversation(id), in: .profile)
         case "settings":
             open(.settings, in: .profile)
         default:

@@ -57,7 +57,6 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 |---|---|---|
 | Universal link for sharing *(needs a domain)* | `ShareLink` shares the Petfinder listing URL (or a text message for mock pets) | Phase 14 |
 | Full description | Petfinder's API only returns a short preview; "Read more" plus "View full listing on Petfinder" | No fix; this is a Petfinder limitation |
-| Action: message shelter | Not on the detail screen yet ("Apply to adopt" was added in Phase 9) | Phase 10 |
 | Compatibility score with your lifestyle | Not shown | Phase 12 (needs the lifestyle questionnaire from Phase 7) |
 | Report listing sent to a moderator *(server)* | Saved on the device only (`UserDefaults` key `listingReports`) | Write to a Firestore `reports` collection once Firebase is added |
 | Momentum when dragging a zoomed photo | Drag stops when your finger lifts | Animate the offset with the drag's predicted end |
@@ -126,10 +125,23 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Uploading attachments with progress *(cloud)* | Photos (ID, lease, vet reference, other) saved on the phone only, shown in the application | Firebase Storage upload with `StorageUploadTask` progress |
 | Separate adopter profile screens (household, home type, pets, experience) | The application form asks these, pre-filled from the lifestyle questionnaire | Fine as is |
 | Applications tied to the account | Stored on the device (`Documents/applications.json`), shared by whoever uses the phone | Phase 8 (sync) |
-| Messages with the shelter about an application | None | Phase 10 |
 | Attaching PDFs / scanning documents | Photos only (from the photo library) | `fileImporter` for PDFs, `VNDocumentCameraViewController` for scanning |
 
-## Later phases (10 onwards)
+## Phase 10: Messaging
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| Real-time chat with real shelters (Firestore listeners) *(cloud)* | Chats are saved on the device; a **simulated shelter** reads your message after ~3s, shows "typing…", and replies ~7s after sending, with an answer based on keywords (visits, fees, kids, dogs, cats, health, applying…) | Firestore `conversations/{id}/messages` with snapshot listeners, plus a shelter-side app |
+| Push notifications for replies *(server)* | Local notifications scheduled when you send (hidden if that chat is open) | Phase 11 + an `onMessageCreate` Cloud Function |
+| Notification Service Extension (rich previews) | Not built: it needs an extension target | Add with the other extensions in Phase 14 |
+| Outbox retrying against a server *(server)* | Messages written offline wait (shown as "Waiting to send") and go out when the phone reconnects (`NetworkMonitor` + `flushOutbox()`) | Same idea, sending to Firestore |
+| Pagination from the server | All messages are on the device; the chat shows the last 40 with "Load earlier messages" | Query by date with `limit` once messages are in Firestore |
+| Real moderation *(server)* | `ContentModerator` blocks a few abusive words and warns about payment/scam phrases before sending. Reports are saved on the device (`messageReports`) | Server-side checks and a review queue |
+| Blocking across devices *(cloud)* | Blocking stops replies in that chat on this phone | Store blocks in Firestore |
+| Real read receipts | Simulated: "Delivered" after 1s, "Read" after 3s | Comes with real chat |
+| Sending messages with several photos or files | One photo per message (from the library) | `PhotosPicker` with `maxSelectionCount` |
+
+## Later phases (11 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
@@ -166,4 +178,4 @@ These were on this list and are now in the app:
 
 ---
 
-**Not yet verified:** Phases 0–5, 7, 9, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–5, 7, 9, 10, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

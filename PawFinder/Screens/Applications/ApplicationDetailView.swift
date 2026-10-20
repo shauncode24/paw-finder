@@ -6,6 +6,8 @@ struct ApplicationDetailView: View {
     let applicationID: UUID
 
     @Environment(ApplicationsStore.self) private var store
+    @Environment(MessagesStore.self) private var messages
+    @Environment(Router.self) private var router
     @State private var confirmWithdraw = false
     @State private var showAnswers = false
 
@@ -160,6 +162,14 @@ struct ApplicationDetailView: View {
             if application.status == .approved {
                 PFButton(title: "We brought \(application.pet.name) home!") {
                     store.markAdopted(applicationID)
+                }
+            }
+            if !application.isClosed {
+                PFButton(title: "Message the shelter", style: .secondary) {
+                    let id = messages.startConversation(shelterID: application.pet.shelterID,
+                                                        shelterName: application.shelterName ?? "Shelter",
+                                                        pet: application.pet)
+                    router.push(.conversation(id))
                 }
             }
             if application.isActive {

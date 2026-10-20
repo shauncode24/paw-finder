@@ -8,6 +8,8 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     /// Set by the app so notification taps can navigate.
     var onOpenURL: ((URL) -> Void)?
+    /// The chat on screen right now; its message notifications aren't shown.
+    var openConversationID: UUID?
 
     private let center = UNUserNotificationCenter.current()
 
@@ -97,15 +99,40 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         "application-\(id.uuidString)-\(status.rawValue)"
     }
 
+    /// Notification for a simulated shelter reply, shown if you're not in that chat.
+    func scheduleMessageReply(_ reply: ScheduledReply, in conversation: Conversation) async {
+        await requestAuthorizationIfNeeded()
+        guard await authorizationStatus() == .authorized else { return }
+        let content = UNMutableNotificationContent()
+        content.title = conversation.shelterName
+        content.body = reply.text
+        content.sound = .default
+        content.threadIdentifier = conversation.id.uuidString
+        content.userInfo = ["url": "pawfinder://conversation/\(conversation.id.uuidString)",
+                            "conversationID": conversation.id.uuidString]
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, reply.date.timeIntervalSinceNow), repeats: false)
+        // One pending notification per chat: a newer reply replaces it.
+        let request = UNNotificationRequest(identifier: "message-\(conversation.id.uuidString)", content: content, trigger: trigger)
+        try? await center.add(request)
+    }
+
+    func cancelMessageNotifications(for conversationID: UUID) {
+        center.removePendingNotificationRequests(withIdentifiers: ["message-\(conversationID.uuidString)"])
+    }
+
     // MARK: - UNUserNotificationCenterDelegate
 
-    /// Show banners even when the app is open.
+    /// Show banners even when the app is open, except for the chat you're looking at.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound])
+        let conversationID = notification.request.content.userInfo["conversationID"] as? String
+        Task { @MainActor in
+            let isOpenChat = conversationID != nil && conversationID == openConversationID?.uuidString
+            completionHandler(isOpenChat ? [] : [.banner, .sound])
+        }
     }
 
     nonisolated func userNotificationCenter(
