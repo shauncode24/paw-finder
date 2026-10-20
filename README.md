@@ -8,7 +8,9 @@ Open `PawFinder.xcodeproj` in Xcode and run. Setup steps (signing, API keys, Fir
 ```
 PawFinder/
   App/            app entry, tab bar, navigation (Router)
-  Screens/        screens (placeholders for now)
+  Screens/        screens and their view models
+  Models/         app data types (Pet)
+  Services/       Petfinder API client, repositories (real + mock)
   DesignSystem/   colors, spacing, fonts, PFButton, PFCard, PFChip, loading/empty/error views
   Config/         Secrets.plist (your keys, gitignored) + Secrets.swift
   Assets.xcassets colors (light + dark) and app icon

@@ -5,14 +5,17 @@ Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list 
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
 ## Current phase
-Phase 0 done (update this line as phases complete)
+Phase 1 done (update this line as phases complete)
 
 ## Setup
-- One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, and add `Models/`, `Services/` when needed.
+- One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, `Models/`, `Services/`.
 - The Xcode project uses folder-synchronized groups, so new files in `PawFinder/` are picked up automatically.
 - iOS 17+, SwiftUI, `@Observable` view models, async/await. Swift 5 language mode.
 - Navigation: `Router` (selected tab + a `[Route]` path per tab). Add `Route` cases for new screens.
 - Keys live in `PawFinder/Config/Secrets.plist` (gitignored) and are read through `Secrets`.
+- Data: screens use the `PetRepository` protocol (from `@Environment(\.petRepository)`). `RemotePetRepository` calls Petfinder through `PetfinderClient` (an actor that handles the OAuth token); `MockPetRepository` is used when no keys are set and in previews. JSON shapes live in `PetfinderModels.swift` and are converted to `Pet` with `toPet()`.
+- Screen pattern: an `@Observable` view model with a `State` enum (loading / loaded / empty / error). See `PetListView` + `PetListViewModel`.
+- No Core Data or unit tests yet; add them only if a phase really needs them.
 - Firebase goes in when a phase needs it (via Swift Package Manager in Xcode).
 
 ## Rules

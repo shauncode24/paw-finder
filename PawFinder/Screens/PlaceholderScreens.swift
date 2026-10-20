@@ -1,18 +1,15 @@
 import SwiftUI
 
-/// Placeholder home screen for each tab. Replace these as each phase is built.
+/// Home screen for each tab. Placeholders are replaced as each phase is built.
 struct TabHomeView: View {
     let tab: AppTab
-    @Environment(Router.self) private var router
+    @Environment(\.petRepository) private var petRepository
 
     var body: some View {
         Group {
             switch tab {
             case .discover:
-                EmptyStateView(icon: "pawprint", title: "Discover pets", message: "Coming in Phase 2.",
-                               buttonTitle: "Open a sample pet") {
-                    router.push(.petDetail(id: "sample"))
-                }
+                PetListView(repository: petRepository)
             case .map:
                 EmptyStateView(icon: "map", title: "Shelters near you", message: "Coming in Phase 5.")
             case .identify:
