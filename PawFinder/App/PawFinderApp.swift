@@ -10,6 +10,7 @@ struct PawFinderApp: App {
     @State private var followedShelters = FollowedSheltersStore()
     @State private var auth: AuthManager
     @State private var profileStore = ProfileStore()
+    @State private var applications = ApplicationsStore()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
@@ -44,6 +45,7 @@ struct PawFinderApp: App {
                 .environment(router)
                 .environment(auth)
                 .environment(profileStore)
+                .environment(applications)
                 .environment(recentlyViewed)
                 .environment(favorites)
                 .environment(locationService)
@@ -60,7 +62,11 @@ struct PawFinderApp: App {
                 }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .background { BackgroundRefresh.schedule() }
+            switch phase {
+            case .background: BackgroundRefresh.schedule()
+            case .active: applications.refresh()   // apply any simulated shelter replies
+            default: break
+            }
         }
         // iOS wakes the app in the background now and then: check favorites for
         // adoptions and followed shelters for new pets.
@@ -75,5 +81,6 @@ struct PawFinderApp: App {
         await NotificationManager.shared.notifyStatusChanges(changed)
         let arrivals = await followedShelters.checkNewArrivals(using: petRepository)
         await NotificationManager.shared.notifyNewArrivals(arrivals)
+        applications.refresh()
     }
 }

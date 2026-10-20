@@ -50,6 +50,12 @@ struct RouteView: View {
                 .navigationTitle("Your lifestyle")
         case .account:
             AccountView()
+        case .applications:
+            ApplicationsListView()
+        case .applicationForm(let id):
+            ApplicationFormView(applicationID: id)
+        case .applicationDetail(let id):
+            ApplicationDetailView(applicationID: id)
         case .designSystem:
             DesignSystemPreviewView()
         }

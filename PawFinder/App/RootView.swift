@@ -31,4 +31,5 @@ struct RootView: View {
         .environment(FollowedSheltersStore())
         .environment(AuthManager())
         .environment(ProfileStore())
+        .environment(ApplicationsStore())
 }

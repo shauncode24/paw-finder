@@ -5,6 +5,7 @@ import SwiftUI
 struct ProfileView: View {
     @Environment(AuthManager.self) private var auth
     @Environment(ProfileStore.self) private var profileStore
+    @Environment(ApplicationsStore.self) private var applications
     @State private var showAuth = false
 
     var body: some View {
@@ -40,6 +41,18 @@ struct ProfileView: View {
             .listRowBackground(Color.pfSurface)
 
             Section {
+                NavigationLink(value: Route.applications) {
+                    HStack {
+                        Label("My applications", systemImage: "doc.text")
+                        Spacer()
+                        let active = applications.applications.filter(\.isActive).count
+                        if active > 0 {
+                            Text("\(active) active")
+                                .font(.pfCaption)
+                                .foregroundStyle(Color.pfTextSecondary)
+                        }
+                    }
+                }
                 NavigationLink(value: Route.editProfile) {
                     Label("Edit profile", systemImage: "person.crop.circle")
                 }

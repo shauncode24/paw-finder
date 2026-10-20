@@ -8,6 +8,10 @@ struct PetDetailView: View {
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
     @Environment(FavoritesStore.self) private var favorites
     @Environment(LocationService.self) private var locationService
+    @Environment(ApplicationsStore.self) private var applications
+    @Environment(ProfileStore.self) private var profileStore
+    @Environment(AuthManager.self) private var auth
+    @Environment(Router.self) private var router
 
     private var pet: Pet { viewModel.pet }
 
@@ -23,6 +27,7 @@ struct PetDetailView: View {
                 VStack(alignment: .leading, spacing: Spacing.xl) {
                     statusBanner
                     header
+                    applyButton
                     attributeChips
                     if favorites.isFavorite(pet.id) {
                         FavoriteNotesSection(pet: pet)
@@ -83,6 +88,37 @@ struct PetDetailView: View {
     }
 
     // MARK: - Sections
+
+    /// "Apply to adopt", or the status of an application already started.
+    @ViewBuilder
+    private var applyButton: some View {
+        if let existing = applications.openApplication(for: pet.id) {
+            Button {
+                router.push(existing.status == .draft ? .applicationForm(existing.id) : .applicationDetail(existing.id))
+            } label: {
+                HStack {
+                    StatusBadge(status: existing.status)
+                    Text(existing.status == .draft ? "Continue your application" : "View your application")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.pfBrandPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.right").foregroundStyle(Color.pfTextSecondary)
+                }
+                .padding(Spacing.md)
+                .background(Color.pfSurface, in: RoundedRectangle(cornerRadius: Radius.medium))
+                .overlay(RoundedRectangle(cornerRadius: Radius.medium).stroke(Color.pfBorder))
+            }
+            .buttonStyle(.plain)
+        } else if !pet.isAdopted {
+            PFButton(title: "Apply to adopt \(pet.name)") {
+                var shelterName: String?
+                if case .loaded(let shelter) = viewModel.shelterState { shelterName = shelter.name }
+                let id = applications.startOrResume(pet: pet, shelterName: shelterName,
+                                                    profile: profileStore.profile, email: auth.user?.email)
+                router.push(.applicationForm(id))
+            }
+        }
+    }
 
     /// Shown when a saved pet was adopted or removed from Petfinder.
     @ViewBuilder
@@ -234,4 +270,6 @@ struct PetDetailView: View {
     .environment(FollowedSheltersStore())
     .environment(AuthManager())
     .environment(ProfileStore())
+    .environment(ApplicationsStore())
+    .environment(Router())
 }

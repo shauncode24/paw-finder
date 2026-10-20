@@ -242,4 +242,5 @@ struct DiscoverView: View {
     .environment(FollowedSheltersStore())
     .environment(AuthManager())
     .environment(ProfileStore())
+    .environment(ApplicationsStore())
 }

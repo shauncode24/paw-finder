@@ -33,6 +33,9 @@ enum Route: Hashable {
     case editProfile
     case lifestyle
     case account
+    case applications
+    case applicationForm(UUID)
+    case applicationDetail(UUID)
     case settings
     case designSystem
 }
@@ -51,6 +54,14 @@ final class Router {
         paths[selectedTab] = []
     }
 
+    /// Swaps the top screen for another (e.g. the form for the tracker after submitting).
+    func replaceTop(with route: Route) {
+        var path = paths[selectedTab] ?? []
+        if !path.isEmpty { path.removeLast() }
+        path.append(route)
+        paths[selectedTab] = path
+    }
+
     /// Switches to a tab and shows one screen on it.
     func open(_ route: Route, in tab: AppTab) {
         selectedTab = tab
@@ -61,6 +72,7 @@ final class Router {
     ///
     ///     pawfinder://pet/12345      a pet
     ///     pawfinder://shelter/NJ333  a shelter profile
+    ///     pawfinder://application/<uuid>  an adoption application
     ///     pawfinder://favorites      a tab (discover, map, identify, favorites, profile)
     ///     pawfinder://settings       the Settings screen
     ///
@@ -77,6 +89,9 @@ final class Router {
         case "shelter":
             guard let argument else { return false }
             open(.shelter(id: argument), in: .map)
+        case "application":
+            guard let argument, let id = UUID(uuidString: argument) else { return false }
+            open(.applicationDetail(id), in: .profile)
         case "settings":
             open(.settings, in: .profile)
         default:

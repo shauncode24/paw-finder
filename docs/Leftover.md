@@ -4,7 +4,7 @@ Things from SPEC.md that are still left out or simplified, to keep PawFinder a m
 
 Each item notes **what we did instead** and **how to add it later**. Items that have been picked up since are listed at the bottom under **Done in the scope bump**.
 
-**Ground rules for now:** no server in the middle and no tests. Items that need either are marked *(server)* or *(tests)*.
+**Ground rules for now:** no server in the middle, no cloud (Firebase Auth for sign-in is the one exception), and no tests. Items that need any of these are marked *(server)*, *(cloud)*, or *(tests)*.
 
 ---
 
@@ -57,7 +57,7 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 |---|---|---|
 | Universal link for sharing *(needs a domain)* | `ShareLink` shares the Petfinder listing URL (or a text message for mock pets) | Phase 14 |
 | Full description | Petfinder's API only returns a short preview; "Read more" plus "View full listing on Petfinder" | No fix; this is a Petfinder limitation |
-| Actions: apply, message shelter | Not on the detail screen yet | Phase 9 (apply), Phase 10 (message) |
+| Action: message shelter | Not on the detail screen yet ("Apply to adopt" was added in Phase 9) | Phase 10 |
 | Compatibility score with your lifestyle | Not shown | Phase 12 (needs the lifestyle questionnaire from Phase 7) |
 | Report listing sent to a moderator *(server)* | Saved on the device only (`UserDefaults` key `listingReports`) | Write to a Firestore `reports` collection once Firebase is added |
 | Momentum when dragging a zoomed photo | Drag stops when your finger lifts | Animate the offset with the drag's predicted end |
@@ -111,7 +111,25 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Changing email or password in the app | Password reset by email only | `user.updatePassword(to:)` after re-authenticating |
 | Replay onboarding | Shown once on first launch | Add a "Show welcome screens" button in Settings that resets `hasCompletedOnboarding` |
 
-## Later phases (8 onwards)
+## Phase 8: Cloud Sync
+
+**Skipped** *(cloud)*. Favorites, collections, notes, saved profile, followed shelters, and applications all stay on the device. Everything in SPEC §8 Phase 8 is still to do: Firestore sync, conflict resolution, offline-to-online reconciliation, and multi-device testing.
+
+## Phase 9: Adoption Application Workflow
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| Cloud Function for status changes + a real shelter on the other end *(server, cloud)* | A **simulated shelter** in `ApplicationsStore`: on submit it plans replies (in review after 1 min, interview after 3, decision after 6) and applies them when their time comes. It declines renters without landlord permission or 10+ hours alone; otherwise approves | A shelter dashboard + Firestore + an `onApplicationStatusChange` Cloud Function |
+| Push notifications for status changes *(server)* | Local notifications scheduled at submit time for each planned reply (cancelled if you withdraw) | Phase 11 |
+| **Live Activity** for application status | Not built: Live Activities need a Widget Extension target | Phase 14, when the widget extension is added |
+| Meet-and-greet scheduling with EventKit | A "best times to meet" text field in the form; the simulated shelter's interview note says they'll contact you | `EKEventEditViewController` to add the meeting to Calendar |
+| Uploading attachments with progress *(cloud)* | Photos (ID, lease, vet reference, other) saved on the phone only, shown in the application | Firebase Storage upload with `StorageUploadTask` progress |
+| Separate adopter profile screens (household, home type, pets, experience) | The application form asks these, pre-filled from the lifestyle questionnaire | Fine as is |
+| Applications tied to the account | Stored on the device (`Documents/applications.json`), shared by whoever uses the phone | Phase 8 (sync) |
+| Messages with the shelter about an application | None | Phase 10 |
+| Attaching PDFs / scanning documents | Photos only (from the photo library) | `fileImporter` for PDFs, `VNDocumentCameraViewController` for scanning |
+
+## Later phases (10 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
@@ -148,4 +166,4 @@ These were on this list and are now in the app:
 
 ---
 
-**Not yet verified:** Phases 0–5, 7, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–5, 7, 9, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

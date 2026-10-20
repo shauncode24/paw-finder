@@ -64,6 +64,39 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// Schedules a notification for each planned (simulated) shelter reply.
+    func scheduleApplicationUpdates(_ application: AdoptionApplication) async {
+        await requestAuthorizationIfNeeded()
+        guard await authorizationStatus() == .authorized else { return }
+        for event in application.scheduledEvents {
+            let content = UNMutableNotificationContent()
+            content.title = "\(application.pet.name): \(event.status.rawValue)"
+            content.body = event.note ?? event.status.explanation
+            content.sound = .default
+            content.userInfo = ["url": "pawfinder://application/\(application.id.uuidString)"]
+
+            let seconds = max(1, event.date.timeIntervalSinceNow)
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
+            let request = UNNotificationRequest(identifier: Self.applicationNotificationID(application.id, event.status),
+                                                content: content, trigger: trigger)
+            try? await center.add(request)
+        }
+    }
+
+    func cancelApplicationUpdates(_ applicationID: UUID) {
+        center.removePendingNotificationRequests(
+            withIdentifiers: ApplicationStatus.allCases.map { Self.applicationNotificationID(applicationID, $0) }
+        )
+    }
+
+    func cancelApplicationUpdate(_ applicationID: UUID, status: ApplicationStatus) {
+        center.removePendingNotificationRequests(withIdentifiers: [Self.applicationNotificationID(applicationID, status)])
+    }
+
+    private static func applicationNotificationID(_ id: UUID, _ status: ApplicationStatus) -> String {
+        "application-\(id.uuidString)-\(status.rawValue)"
+    }
+
     // MARK: - UNUserNotificationCenterDelegate
 
     /// Show banners even when the app is open.
