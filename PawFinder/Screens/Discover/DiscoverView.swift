@@ -177,4 +177,5 @@ struct DiscoverView: View {
             .navigationDestination(for: Route.self) { RouteView(route: $0) }
     }
     .environment(RecentlyViewedStore())
+    .environment(FavoritesStore(fileName: "preview-favorites.json"))
 }

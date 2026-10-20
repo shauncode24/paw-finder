@@ -5,7 +5,7 @@ Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list 
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
 ## Current phase
-Phase 3 done (update this line as phases complete)
+Phase 4 done (update this line as phases complete)
 
 ## Setup
 - One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, `Models/`, `Services/`.
@@ -18,6 +18,7 @@ Phase 3 done (update this line as phases complete)
 - Discover: search and filters live in one `PetFilters` value (saved to UserDefaults, minus search text) that maps to Petfinder query params. The view reloads via `.task(id: filters)` with a short debounce. `PetCard`, `PetPhoto` (AsyncImage + bigger `URLCache`), and `PetRail` are reusable.
 - `Route.petDetail(Pet)` carries the whole pet. `RecentlyViewedStore` (environment) records opened pets.
 - Pet detail (`Screens/PetDetail/`): `PetDetailView` + `PetDetailViewModel` (loads `Shelter` via `fetchShelter`, geocodes its address with `CLGeocoder`, and finds similar pets). `PhotoCarousel` has the full-screen zoom viewer; `ShelterCard` has the mini-map and contact links. `FlowLayout` (DesignSystem) wraps chips.
+- Favorites (`Screens/Favorites/`): `FavoritesStore` (environment, `@MainActor @Observable`) saves `FavoritePet` snapshots + `PetCollection`s to `Documents/favorites.json`. `FavoriteButton` is the animated heart (on `PetCard` and the detail toolbar). `refreshStatuses(using:)` re-fetches favorites to detect adopted/removed pets. Mock pet `mock-5` "gets adopted" on refresh to demo this.
 - No Core Data or unit tests yet; add them only if a phase really needs them.
 - Firebase goes in when a phase needs it (via Swift Package Manager in Xcode).
 

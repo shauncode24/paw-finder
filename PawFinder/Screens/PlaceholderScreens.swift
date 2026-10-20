@@ -15,7 +15,7 @@ struct TabHomeView: View {
             case .identify:
                 EmptyStateView(icon: "camera.viewfinder", title: "Identify a breed", message: "Coming in Phase 6.")
             case .favorites:
-                EmptyStateView(icon: "heart", title: "No favorites yet", message: "Coming in Phase 4.")
+                FavoritesView()
             case .profile:
                 List {
                     NavigationLink("Design system", value: Route.designSystem)

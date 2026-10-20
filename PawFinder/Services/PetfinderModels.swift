@@ -82,6 +82,7 @@ struct PetfinderAnimal: Decodable {
     let photos: [Photo]?
     let publishedAt: String?   // e.g. "2026-09-04T14:49:09+0000"
     let distance: Double?      // only present when the request had a location
+    let status: String?
     let contact: Contact?
 
     struct Breeds: Decodable {
@@ -143,7 +144,8 @@ struct PetfinderAnimal: Decodable {
             webURL: url,
             primaryBreed: breeds?.primary,
             contactEmail: contact?.email,
-            contactPhone: contact?.phone
+            contactPhone: contact?.phone,
+            status: status
         )
     }
 

@@ -67,7 +67,7 @@ Each item notes **what we did instead** and **how to add it later**.
 | Video in the carousel | Photos only | Petfinder's `videos` field has embed HTML; show it in a `WKWebView` (Petfinder videos are YouTube embeds) |
 | Universal link for sharing (`pawfinder.app/pet/123`) | `ShareLink` shares the Petfinder listing URL (or a text message for mock pets) | Needs a domain + Associated Domains (Phase 14) |
 | Full description | Petfinder's API only returns a short preview; we show it with "Read more" plus a "View full listing on Petfinder" link | No API fix; this is a Petfinder limitation |
-| Actions: favorite, apply, message shelter | Not on the detail screen yet | Phase 4 (favorite), Phase 9 (apply), Phase 10 (message) |
+| Actions: apply, message shelter | Not on the detail screen yet (favorite was added in Phase 4) | Phase 9 (apply), Phase 10 (message) |
 | Compatibility score with your lifestyle | Not shown | Phase 12 (needs the lifestyle questionnaire from Phase 7) |
 | Distance from **your** location | Only shows distance when Discover had a typed location | Phase 5 `LocationService` |
 | Shelter profile page (tapping the shelter) | Shelter card with name, address, mini-map, call/email/website; `Route.shelter` is still a placeholder | Phase 5 |
@@ -77,10 +77,24 @@ Each item notes **what we did instead** and **how to add it later**.
 | Refreshing the pet's status when the detail opens | Shows the data from the grid/rail (could be stale from Recently viewed) | Call `repository.fetchPet(id:)` on appear and replace the pet |
 | Shelter + geocoding cache | Shelter and its map location are fetched every time a detail opens | Keep a `[shelterID: Shelter]` dictionary in the repository |
 
-## Later phases (4 onwards)
+## Phase 4: Favorites, Collections & Offline
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| Core Data storage | One JSON file (`Documents/favorites.json`) written by `FavoritesStore` | Move to SwiftData/Core Data if the data gets large or needs queries |
+| Outbox for offline changes (queue + retry to a server) | Not needed yet: favorites only live on the device, so every change is instant and works offline | Add when favorites sync to Firebase (Phase 8): queue writes while offline, send them when back online |
+| Spotlight indexing of favorites | None | `CSSearchableIndex` with one `CSSearchableItem` per favorite; open the pet via `onContinueUserActivity(CSSearchableItemActionType)` |
+| Notifications when a favorite's status changes | A dot and an "Adopted" / "No longer listed" label in Favorites, plus a banner on the detail screen | Phase 11 (push), or a local notification after a background refresh |
+| Background status checks | Checked when the Favorites tab opens (at most once an hour) and on pull to refresh | `BGAppRefreshTask` to check while the app is closed |
+| "Pending" status | Petfinder only reports adoptable/adopted/found, so we show "Adopted" or "No longer listed" | No fix; this is a Petfinder limitation |
+| Offline photos | Photos come from the image cache, if they were loaded before | Save each favorite's first photo to disk when it's favorited |
+| Reordering pets inside a collection from the detail screen | Reorder from the Favorites tab (Edit button); new pets go to the end | Fine as is |
+| Unit/integration tests for the store | None | Test `FavoritesStore` with a temporary `fileName` |
+
+## Later phases (5 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
 ---
 
-**Not yet verified:** Phases 0–3 were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–4 were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

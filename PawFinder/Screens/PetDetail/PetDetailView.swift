@@ -6,6 +6,7 @@ struct PetDetailView: View {
     @State private var isDescriptionExpanded = false
     @State private var showReport = false
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
+    @Environment(FavoritesStore.self) private var favorites
 
     private var pet: Pet { viewModel.pet }
 
@@ -19,8 +20,12 @@ struct PetDetailView: View {
                 PhotoCarousel(photoURLs: photos, species: pet.species)
 
                 VStack(alignment: .leading, spacing: Spacing.xl) {
+                    statusBanner
                     header
                     attributeChips
+                    if favorites.isFavorite(pet.id) {
+                        FavoriteNotesSection(pet: pet)
+                    }
                     about
                     goodWith
                     section("Shelter") {
@@ -42,6 +47,7 @@ struct PetDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                FavoriteButton(pet: pet)
                 shareButton
                 Menu {
                     Button("Report listing", systemImage: "flag") { showReport = true }
@@ -55,10 +61,33 @@ struct PetDetailView: View {
             ReportListingSheet(pet: pet)
         }
         .task { await viewModel.load() }
-        .onAppear { recentlyViewed.add(pet) }
+        .onAppear {
+            recentlyViewed.add(pet)
+            favorites.markStatusSeen(pet.id)
+        }
     }
 
     // MARK: - Sections
+
+    /// Shown when a saved pet was adopted or removed from Petfinder.
+    @ViewBuilder
+    private var statusBanner: some View {
+        let favorite = favorites.favorite(for: pet.id)
+        if favorite?.isListed == false {
+            banner("This listing was removed from Petfinder. It may have been adopted.", color: .pfError)
+        } else if (favorite?.pet ?? pet).isAdopted {
+            banner("\(pet.name) has been adopted!", color: .pfSuccess)
+        }
+    }
+
+    private func banner(_ text: String, color: Color) -> some View {
+        Label(text, systemImage: "info.circle.fill")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(color)
+            .padding(Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(color.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.medium))
+    }
 
     private var photos: [URL] {
         pet.photoURLs.isEmpty ? [pet.thumbnailURL].compactMap { $0 } : pet.photoURLs
@@ -185,4 +214,5 @@ struct PetDetailView: View {
         PetDetailView(pet: MockPetRepository.samplePets[0], repository: MockPetRepository())
     }
     .environment(RecentlyViewedStore())
+    .environment(FavoritesStore(fileName: "preview-favorites.json"))
 }

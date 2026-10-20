@@ -28,6 +28,7 @@ struct PetPhoto: View {
 /// A grid cell: photo on top, name and details below.
 struct PetCard: View {
     let pet: Pet
+    var showsFavoriteButton = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -36,6 +37,11 @@ struct PetCard: View {
                 .frame(height: 150)
                 .overlay { PetPhoto(url: pet.thumbnailURL, species: pet.species) }
                 .clipped()
+                .overlay(alignment: .topTrailing) {
+                    if showsFavoriteButton {
+                        FavoriteButton(pet: pet, style: .overlay)
+                    }
+                }
 
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(pet.name)
@@ -74,7 +80,7 @@ struct PetCard: View {
 /// Grey placeholder card shown while the first page loads.
 struct SkeletonPetCard: View {
     var body: some View {
-        PetCard(pet: MockPetRepository.samplePets[0])
+        PetCard(pet: MockPetRepository.samplePets[0], showsFavoriteButton: false)
             .redacted(reason: .placeholder)
             .accessibilityLabel("Loading")
     }
@@ -112,4 +118,5 @@ struct PetRail: View {
     }
     .padding()
     .background(Color.pfBackground)
+    .environment(FavoritesStore(fileName: "preview-favorites.json"))
 }

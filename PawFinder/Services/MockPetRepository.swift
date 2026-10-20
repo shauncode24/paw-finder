@@ -27,9 +27,11 @@ struct MockPetRepository: PetRepository {
 
     func fetchPet(id: String) async throws -> Pet {
         try await Task.sleep(for: delay)
-        guard let pet = Self.samplePets.first(where: { $0.id == id }) else {
+        guard var pet = Self.samplePets.first(where: { $0.id == id }) else {
             throw APIError.notFound
         }
+        // Pretend Charlie (mock-5) just got adopted, so favorites can show a status change.
+        if id == "mock-5" { pet.status = "adopted" }
         return pet
     }
 
@@ -118,7 +120,8 @@ struct MockPetRepository: PetRepository {
                 webURL: nil,
                 primaryBreed: breeds[index % breeds.count],
                 contactEmail: "adopt@example.com",
-                contactPhone: "(555) 555-01\(String(format: "%02d", index))"
+                contactPhone: "(555) 555-01\(String(format: "%02d", index))",
+                status: "adoptable"
             )
         }
     }()

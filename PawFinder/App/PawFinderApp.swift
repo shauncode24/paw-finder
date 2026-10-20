@@ -4,6 +4,7 @@ import SwiftUI
 struct PawFinderApp: App {
     @State private var router = Router()
     @State private var recentlyViewed = RecentlyViewedStore()
+    @State private var favorites = FavoritesStore()
     private let petRepository = PetRepositoryFactory.make()
 
     init() {
@@ -17,6 +18,7 @@ struct PawFinderApp: App {
             RootView()
                 .environment(router)
                 .environment(recentlyViewed)
+                .environment(favorites)
                 .environment(\.petRepository, petRepository)
                 .tint(.pfBrandPrimary)
         }

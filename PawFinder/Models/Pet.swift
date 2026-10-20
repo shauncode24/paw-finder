@@ -14,7 +14,7 @@ struct Pet: Identifiable, Hashable, Codable {
     let photoURLs: [URL]         // large photos, for the detail screen
     let thumbnailURL: URL?       // small photo, for grids and rails
     let location: String         // "Austin, TX"
-    let distance: Double?        // miles, only when searching near a location
+    var distance: Double?        // miles, only when searching near a location
     let shelterID: String
     let goodWithKids: Bool?      // nil = unknown
     let goodWithDogs: Bool?
@@ -29,6 +29,11 @@ struct Pet: Identifiable, Hashable, Codable {
     var primaryBreed: String? = nil   // "Beagle", used to find similar pets
     var contactEmail: String? = nil
     var contactPhone: String? = nil
+
+    // Added in Phase 4.
+    var status: String? = nil         // Petfinder: "adoptable", "adopted", "found"
+
+    var isAdopted: Bool { status?.lowercased() == "adopted" }
 
     /// "Young · Male · Medium", for list rows.
     var summary: String {
