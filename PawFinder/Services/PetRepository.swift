@@ -3,9 +3,10 @@ import SwiftUI
 /// Where screens get pets from. Screens only know about this protocol, so
 /// we can swap real data for mock data without changing any UI code.
 protocol PetRepository {
-    /// - Parameter type: Petfinder animal type, e.g. "dog" or "cat". nil = all.
-    func fetchPets(page: Int, type: String?) async throws -> PetPage
+    func fetchPets(page: Int, filters: PetFilters) async throws -> PetPage
     func fetchPet(id: String) async throws -> Pet
+    /// All breed names for a species, for search suggestions.
+    func fetchBreeds(for species: PetFilters.Species) async throws -> [String]
 }
 
 /// Real data from Petfinder.
@@ -13,9 +14,11 @@ struct RemotePetRepository: PetRepository {
     let client: PetfinderClient
     var pageSize = 20
 
-    func fetchPets(page: Int, type: String?) async throws -> PetPage {
-        var query = ["page": String(page), "limit": String(pageSize), "status": "adoptable"]
-        if let type { query["type"] = type }
+    func fetchPets(page: Int, filters: PetFilters) async throws -> PetPage {
+        var query = filters.queryItems
+        query["page"] = String(page)
+        query["limit"] = String(pageSize)
+        query["status"] = "adoptable"
 
         let response: PetfinderAnimalsResponse = try await client.get("animals", query: query)
         return PetPage(
@@ -28,6 +31,11 @@ struct RemotePetRepository: PetRepository {
     func fetchPet(id: String) async throws -> Pet {
         let response: PetfinderAnimalResponse = try await client.get("animals/\(id)")
         return response.animal.toPet()
+    }
+
+    func fetchBreeds(for species: PetFilters.Species) async throws -> [String] {
+        let response: PetfinderBreedsResponse = try await client.get("types/\(species.rawValue.lowercased())/breeds")
+        return response.breeds.map(\.name)
     }
 }
 

@@ -2,7 +2,7 @@ import Foundation
 
 /// A pet as the app uses it. API responses are converted into this
 /// (see PetfinderModels.swift), so screens never deal with raw JSON.
-struct Pet: Identifiable, Hashable {
+struct Pet: Identifiable, Hashable, Codable {
     let id: String
     let name: String
     let species: String          // "Dog", "Cat", ...
@@ -11,8 +11,10 @@ struct Pet: Identifiable, Hashable {
     let gender: String           // "Male", "Female", "Unknown"
     let size: String             // "Small", "Medium", "Large", "Extra Large"
     let description: String?
-    let photoURLs: [URL]
+    let photoURLs: [URL]         // large photos, for the detail screen
+    let thumbnailURL: URL?       // small photo, for grids and rails
     let location: String         // "Austin, TX"
+    let distance: Double?        // miles, only when searching near a location
     let shelterID: String
     let goodWithKids: Bool?      // nil = unknown
     let goodWithDogs: Bool?

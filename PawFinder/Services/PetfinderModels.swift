@@ -17,6 +17,14 @@ struct PetfinderAnimalResponse: Decodable {
     let animal: PetfinderAnimal
 }
 
+struct PetfinderBreedsResponse: Decodable {
+    let breeds: [Breed]
+
+    struct Breed: Decodable {
+        let name: String
+    }
+}
+
 struct PetfinderAnimal: Decodable {
     let id: Int
     let organizationId: String?
@@ -33,6 +41,7 @@ struct PetfinderAnimal: Decodable {
     let description: String?
     let photos: [Photo]?
     let publishedAt: String?   // e.g. "2026-09-04T14:49:09+0000"
+    let distance: Double?      // only present when the request had a location
     let contact: Contact?
 
     struct Breeds: Decodable {
@@ -53,6 +62,7 @@ struct PetfinderAnimal: Decodable {
     }
 
     struct Photo: Decodable {
+        let small: URL?
         let medium: URL?
         let large: URL?
         let full: URL?
@@ -77,10 +87,14 @@ struct PetfinderAnimal: Decodable {
             gender: gender ?? "",
             size: size ?? "",
             description: description.map(Self.decodeEntities),
-            photoURLs: (photos ?? []).compactMap { $0.large ?? $0.medium ?? $0.full },
+            photoURLs: (photos ?? []).compactMap { $0.large ?? $0.full ?? $0.medium },
+            // "medium" is ~300px wide: small enough for grid cells, so we never
+            // decode full-size photos just to show a thumbnail.
+            thumbnailURL: photos?.first.flatMap { $0.medium ?? $0.small ?? $0.large },
             location: [contact?.address?.city, contact?.address?.state]
                 .compactMap { $0 }
                 .joined(separator: ", "),
+            distance: distance,
             shelterID: organizationId ?? "",
             goodWithKids: environment?.children,
             goodWithDogs: environment?.dogs,

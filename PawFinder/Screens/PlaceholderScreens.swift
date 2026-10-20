@@ -9,7 +9,7 @@ struct TabHomeView: View {
         Group {
             switch tab {
             case .discover:
-                PetListView(repository: petRepository)
+                DiscoverView(repository: petRepository)
             case .map:
                 EmptyStateView(icon: "map", title: "Shelters near you", message: "Coming in Phase 5.")
             case .identify:
@@ -35,14 +35,42 @@ struct RouteView: View {
 
     var body: some View {
         switch route {
-        case .petDetail(let id):
-            EmptyStateView(icon: "pawprint.fill", title: "Pet details", message: "Pet \(id)")
-                .navigationTitle("Pet details")
+        case .petDetail(let pet):
+            PetDetailPlaceholder(pet: pet)
         case .shelter(let id):
             EmptyStateView(icon: "house.fill", title: "Shelter", message: "Shelter \(id)")
                 .navigationTitle("Shelter")
         case .designSystem:
             DesignSystemPreviewView()
         }
+    }
+}
+
+/// Temporary detail screen until Phase 3. Records the pet as recently viewed.
+private struct PetDetailPlaceholder: View {
+    let pet: Pet
+    @Environment(RecentlyViewedStore.self) private var recentlyViewed
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                Color.clear
+                    .frame(height: 280)
+                    .overlay { PetPhoto(url: pet.photoURLs.first ?? pet.thumbnailURL, species: pet.species) }
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.large))
+                Text(pet.name).font(.pfTitle)
+                Text(pet.breed).foregroundStyle(Color.pfTextSecondary)
+                Text(pet.summary).foregroundStyle(Color.pfTextSecondary)
+                Text("Full details coming in Phase 3.")
+                    .font(.pfCaption)
+                    .foregroundStyle(Color.pfTextSecondary)
+            }
+            .foregroundStyle(Color.pfTextPrimary)
+            .padding(Spacing.lg)
+        }
+        .background(Color.pfBackground)
+        .navigationTitle(pet.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear { recentlyViewed.add(pet) }
     }
 }

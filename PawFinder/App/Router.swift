@@ -26,7 +26,7 @@ enum AppTab: Hashable, CaseIterable {
 
 /// Every screen you can push onto a tab. Add cases as new screens are built.
 enum Route: Hashable {
-    case petDetail(id: String)
+    case petDetail(Pet)
     case shelter(id: String)
     case designSystem
 }

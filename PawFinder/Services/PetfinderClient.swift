@@ -97,6 +97,7 @@ actor PetfinderClient {
     private func check(_ status: Int) throws {
         switch status {
         case 200..<300: return
+        case 400: throw APIError.badRequest
         case 401, 403: throw APIError.unauthorized
         case 404: throw APIError.notFound
         case 429: throw APIError.rateLimited

@@ -4,6 +4,7 @@ import Foundation
 enum APIError: LocalizedError {
     case missingKeys
     case offline
+    case badRequest
     case unauthorized
     case notFound
     case rateLimited
@@ -15,6 +16,7 @@ enum APIError: LocalizedError {
         switch self {
         case .missingKeys: "Add your Petfinder keys to Secrets.plist."
         case .offline: "You're offline. Check your connection and try again."
+        case .badRequest: "Some filters aren't valid. Check the location (use a US ZIP code or \"City, ST\")."
         case .unauthorized: "Couldn't sign in to Petfinder. Check your API key and secret."
         case .notFound: "This pet couldn't be found. It may have been adopted."
         case .rateLimited: "Too many requests. Please wait a moment and try again."

@@ -1,0 +1,141 @@
+import SwiftUI
+
+/// The filter sheet. Edits a copy of the filters; nothing changes until "Show results".
+struct FilterSheet: View {
+    @State private var draft: PetFilters
+    let onApply: (PetFilters) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private let distances = [10, 25, 50, 100, 250]
+
+    init(filters: PetFilters, onApply: @escaping (PetFilters) -> Void) {
+        _draft = State(initialValue: filters)
+        self.onApply = onApply
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.xl) {
+                    section("Species") {
+                        chips(PetFilters.Species.allCases, isSelected: { draft.species == $0 }) { species in
+                            draft.species = draft.species == species ? nil : species
+                            draft.breed = nil   // breed belongs to the old species
+                        }
+                    }
+
+                    if let breed = draft.breed {
+                        section("Breed") {
+                            PFChip(title: "\(breed)  ✕", isSelected: true) { draft.breed = nil }
+                        }
+                    }
+
+                    section("Age") {
+                        chips(PetFilters.Age.allCases, isSelected: { draft.ages.contains($0) }) { age in
+                            draft.ages.formSymmetricDifference([age])
+                        }
+                    }
+
+                    section("Size") {
+                        chips(PetFilters.Size.allCases, isSelected: { draft.sizes.contains($0) }) { size in
+                            draft.sizes.formSymmetricDifference([size])
+                        }
+                    }
+
+                    section("Gender") {
+                        chips(PetFilters.Gender.allCases, isSelected: { draft.gender == $0 }) { gender in
+                            draft.gender = draft.gender == gender ? nil : gender
+                        }
+                    }
+
+                    section("Good with") {
+                        VStack(spacing: Spacing.sm) {
+                            Toggle("Kids", isOn: $draft.goodWithKids)
+                            Toggle("Dogs", isOn: $draft.goodWithDogs)
+                            Toggle("Cats", isOn: $draft.goodWithCats)
+                            Toggle("House-trained", isOn: $draft.houseTrained)
+                        }
+                        .tint(Color.pfBrandPrimary)
+                    }
+
+                    section("Location") {
+                        VStack(alignment: .leading, spacing: Spacing.sm) {
+                            TextField("ZIP code or City, ST", text: $draft.location)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled()
+                                .padding(Spacing.md)
+                                .background(Color.pfSurfaceElevated, in: RoundedRectangle(cornerRadius: Radius.medium))
+                                .overlay(RoundedRectangle(cornerRadius: Radius.medium).stroke(Color.pfBorder))
+                            Picker("Distance", selection: $draft.distance) {
+                                ForEach(distances, id: \.self) { Text("\($0) mi").tag($0) }
+                            }
+                            .pickerStyle(.segmented)
+                            .disabled(draft.location.isEmpty)
+                        }
+                    }
+
+                    section("Sort by") {
+                        Picker("Sort by", selection: $draft.sort) {
+                            ForEach(PetFilters.Sort.allCases, id: \.self) { sort in
+                                Text(sort.rawValue).tag(sort)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                }
+                .padding(Spacing.lg)
+            }
+            .background(Color.pfBackground)
+            .navigationTitle("Filters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .destructiveAction) {
+                    Button("Reset") {
+                        var cleared = PetFilters()
+                        cleared.name = draft.name
+                        draft = cleared
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                PFButton(title: "Show results") {
+                    onApply(draft)
+                    dismiss()
+                }
+                .padding(Spacing.lg)
+                .background(Color.pfBackground)
+            }
+        }
+    }
+
+    private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(title)
+                .font(.pfHeadline)
+                .foregroundStyle(Color.pfTextPrimary)
+            content()
+        }
+    }
+
+    /// A horizontally scrolling row of chips for an enum's cases.
+    private func chips<Option: RawRepresentable & Hashable>(
+        _ options: [Option],
+        isSelected: @escaping (Option) -> Bool,
+        toggle: @escaping (Option) -> Void
+    ) -> some View where Option.RawValue == String {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.sm) {
+                ForEach(options, id: \.self) { option in
+                    PFChip(title: option.rawValue, isSelected: isSelected(option)) { toggle(option) }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    FilterSheet(filters: PetFilters()) { _ in }
+}

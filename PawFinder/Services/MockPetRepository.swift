@@ -1,18 +1,25 @@
 import Foundation
 
 /// Fake pets for previews, and for running the app without API keys.
+/// Applies filters roughly the way Petfinder does, so the UI can be tested.
 struct MockPetRepository: PetRepository {
     var pageSize = 10
     /// Fake network delay so loading states are visible.
     var delay: Duration = .milliseconds(600)
 
-    func fetchPets(page: Int, type: String?) async throws -> PetPage {
+    func fetchPets(page: Int, filters: PetFilters) async throws -> PetPage {
         try await Task.sleep(for: delay)
 
-        let matching = Self.samplePets.filter { pet in
-            guard let type else { return true }
-            return pet.species.lowercased() == type.lowercased()
+        var matching = Self.samplePets.filter { matches($0, filters) }
+        switch filters.sort {
+        case .newest, .nearest:
+            matching.sort { ($0.publishedAt ?? .distantPast) > ($1.publishedAt ?? .distantPast) }
+        case .longestWaiting:
+            matching.sort { ($0.publishedAt ?? .distantPast) < ($1.publishedAt ?? .distantPast) }
+        case .random:
+            matching.shuffle()
         }
+
         let totalPages = max(1, Int((Double(matching.count) / Double(pageSize)).rounded(.up)))
         let pagePets = Array(matching.dropFirst((page - 1) * pageSize).prefix(pageSize))
         return PetPage(pets: pagePets, currentPage: page, totalPages: totalPages)
@@ -26,14 +33,38 @@ struct MockPetRepository: PetRepository {
         return pet
     }
 
+    func fetchBreeds(for species: PetFilters.Species) async throws -> [String] {
+        switch species {
+        case .dog: Self.dogBreeds
+        case .cat: Self.catBreeds
+        case .rabbit, .bird: []
+        }
+    }
+
+    private func matches(_ pet: Pet, _ filters: PetFilters) -> Bool {
+        let name = filters.name.trimmingCharacters(in: .whitespaces)
+        if !name.isEmpty, !pet.name.localizedCaseInsensitiveContains(name) { return false }
+        if let species = filters.species, pet.species != species.rawValue { return false }
+        if let breed = filters.breed, !pet.breed.localizedCaseInsensitiveContains(breed) { return false }
+        if !filters.ages.isEmpty, !filters.ages.map(\.rawValue).contains(pet.age) { return false }
+        if !filters.sizes.isEmpty, !filters.sizes.map(\.rawValue).contains(pet.size) { return false }
+        if let gender = filters.gender, pet.gender != gender.rawValue { return false }
+        if filters.goodWithKids, pet.goodWithKids != true { return false }
+        if filters.goodWithDogs, pet.goodWithDogs != true { return false }
+        if filters.goodWithCats, pet.goodWithCats != true { return false }
+        if filters.houseTrained, !pet.houseTrained { return false }
+        return true
+    }
+
     // MARK: - Sample data
+
+    static let dogBreeds = ["Beagle", "Labrador Retriever", "German Shepherd Dog", "Golden Retriever", "Pit Bull Terrier"]
+    static let catBreeds = ["Domestic Short Hair", "Siamese", "Maine Coon", "Tabby", "Persian"]
 
     static let samplePets: [Pet] = {
         let names = ["Biscuit", "Luna", "Milo", "Bella", "Charlie", "Nala", "Oliver", "Daisy", "Max", "Coco",
                      "Leo", "Ruby", "Simba", "Rosie", "Buddy", "Cleo", "Teddy", "Willow", "Rocky", "Pepper",
                      "Ziggy", "Hazel", "Bear", "Olive", "Tucker"]
-        let dogBreeds = ["Beagle", "Labrador Retriever", "German Shepherd", "Golden Retriever", "Pit Bull Terrier"]
-        let catBreeds = ["Domestic Short Hair", "Siamese", "Maine Coon", "Tabby", "Persian"]
         let ages = ["Baby", "Young", "Adult", "Senior"]
         let sizes = ["Small", "Medium", "Large"]
         let cities = ["Austin, TX", "Denver, CO", "Portland, OR", "Chicago, IL", "Raleigh, NC"]
@@ -51,7 +82,9 @@ struct MockPetRepository: PetRepository {
                 size: sizes[index % sizes.count],
                 description: "\(name) is a friendly \(isDog ? "pup" : "cat") looking for a loving home.",
                 photoURLs: [],
+                thumbnailURL: nil,
                 location: cities[index % cities.count],
+                distance: nil,
                 shelterID: "shelter-\(index % 4 + 1)",
                 goodWithKids: index % 4 == 3 ? nil : index % 4 != 1,
                 goodWithDogs: isDog ? true : nil,
