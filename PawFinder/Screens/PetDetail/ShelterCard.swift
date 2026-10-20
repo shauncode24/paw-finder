@@ -5,6 +5,8 @@ import SwiftUI
 struct ShelterCard: View {
     let state: PetDetailViewModel.ShelterState
     let coordinate: CLLocationCoordinate2D?
+    /// The user's last known location, for "x miles away" (nil if never shared).
+    var userLocation: CLLocation?
     let pet: Pet
     let retry: () -> Void
     @Environment(\.openURL) private var openURL
@@ -41,7 +43,7 @@ struct ShelterCard: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.pfTextSecondary)
                 }
-                if let distance = pet.distance {
+                if let distance = distanceInMiles {
                     Text("\(Int(distance.rounded())) miles away")
                         .font(.pfCaption)
                         .foregroundStyle(Color.pfTextSecondary)
@@ -50,6 +52,10 @@ struct ShelterCard: View {
 
             if let coordinate {
                 miniMap(shelter: shelter, coordinate: coordinate)
+                Link(destination: directionsURL(shelter: shelter, coordinate: coordinate)) {
+                    Label("Get directions", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
+                        .font(.subheadline.weight(.semibold))
+                }
             }
 
             contactButtons(phone: shelter.phone ?? pet.contactPhone,
@@ -103,6 +109,25 @@ struct ShelterCard: View {
                 .foregroundStyle(Color.pfBrandPrimary)
                 .background(Color.pfBrandDeep, in: RoundedRectangle(cornerRadius: Radius.medium))
         }
+    }
+
+    /// Prefer the real distance from the user; fall back to Petfinder's search distance.
+    private var distanceInMiles: Double? {
+        if let userLocation, let coordinate {
+            return userLocation.miles(to: coordinate)
+        }
+        return pet.distance
+    }
+
+    /// Opens Apple Maps with driving directions from the user's location.
+    private func directionsURL(shelter: Shelter, coordinate: CLLocationCoordinate2D) -> URL {
+        var components = URLComponents(string: "https://maps.apple.com/")
+        components?.queryItems = [
+            URLQueryItem(name: "daddr", value: "\(coordinate.latitude),\(coordinate.longitude)"),
+            URLQueryItem(name: "q", value: shelter.name),
+            URLQueryItem(name: "dirflg", value: "d"),
+        ]
+        return components?.url ?? URL(fileURLWithPath: "/")
     }
 
     private func appleMapsURL(name: String, coordinate: CLLocationCoordinate2D) -> URL {

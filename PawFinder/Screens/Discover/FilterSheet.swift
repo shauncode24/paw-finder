@@ -3,8 +3,11 @@ import SwiftUI
 /// The filter sheet. Edits a copy of the filters; nothing changes until "Show results".
 struct FilterSheet: View {
     @State private var draft: PetFilters
+    @State private var isLocating = false
+    @State private var locationError: String?
     let onApply: (PetFilters) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(LocationService.self) private var locationService
 
     private let distances = [10, 25, 50, 100, 250]
 
@@ -42,6 +45,12 @@ struct FilterSheet: View {
                         }
                     }
 
+                    section("Coat") {
+                        chips(PetFilters.Coat.allCases, isSelected: { draft.coats.contains($0) }) { coat in
+                            draft.coats.formSymmetricDifference([coat])
+                        }
+                    }
+
                     section("Gender") {
                         chips(PetFilters.Gender.allCases, isSelected: { draft.gender == $0 }) { gender in
                             draft.gender = draft.gender == gender ? nil : gender
@@ -54,24 +63,48 @@ struct FilterSheet: View {
                             Toggle("Dogs", isOn: $draft.goodWithDogs)
                             Toggle("Cats", isOn: $draft.goodWithCats)
                             Toggle("House-trained", isOn: $draft.houseTrained)
+                            Toggle("Special needs", isOn: $draft.specialNeeds)
                         }
                         .tint(Color.pfBrandPrimary)
                     }
 
                     section("Location") {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
-                            TextField("ZIP code or City, ST", text: $draft.location)
+                            TextField("ZIP code or City, ST", text: locationText)
                                 .textInputAutocapitalization(.words)
                                 .autocorrectionDisabled()
                                 .padding(Spacing.md)
                                 .background(Color.pfSurfaceElevated, in: RoundedRectangle(cornerRadius: Radius.medium))
                                 .overlay(RoundedRectangle(cornerRadius: Radius.medium).stroke(Color.pfBorder))
+                            Button {
+                                Task { await useCurrentLocation() }
+                            } label: {
+                                if isLocating {
+                                    ProgressView()
+                                } else {
+                                    Label("Use my current location", systemImage: "location.fill")
+                                }
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .disabled(isLocating)
+                            if let locationError {
+                                Text(locationError)
+                                    .font(.pfCaption)
+                                    .foregroundStyle(Color.pfError)
+                            }
                             Picker("Distance", selection: $draft.distance) {
                                 ForEach(distances, id: \.self) { Text("\($0) mi").tag($0) }
                             }
                             .pickerStyle(.segmented)
                             .disabled(draft.location.isEmpty)
                         }
+                    }
+
+                    section("Time listed") {
+                        Picker("Time listed", selection: $draft.listed) {
+                            ForEach(PetFilters.Listed.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.menu)
                     }
 
                     section("Sort by") {
@@ -111,6 +144,30 @@ struct FilterSheet: View {
         }
     }
 
+    /// Shows "Current location" when GPS was used; typing replaces it with a ZIP/city.
+    private var locationText: Binding<String> {
+        Binding(
+            get: { draft.locationLabel },
+            set: { newValue in
+                draft.location = newValue
+                draft.locationName = nil
+            }
+        )
+    }
+
+    private func useCurrentLocation() async {
+        isLocating = true
+        locationError = nil
+        defer { isLocating = false }
+        do {
+            let location = try await locationService.requestLocation()
+            draft.location = location.petfinderQuery
+            draft.locationName = "Current location"
+        } catch {
+            locationError = error.localizedDescription
+        }
+    }
+
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
             Text(title)
@@ -138,4 +195,5 @@ struct FilterSheet: View {
 
 #Preview {
     FilterSheet(filters: PetFilters()) { _ in }
+        .environment(LocationService())
 }

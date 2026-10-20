@@ -26,24 +26,37 @@ actor PetfinderClient {
         components?.queryItems = query.isEmpty ? nil : query.map { URLQueryItem(name: $0.key, value: $0.value) }
         guard let url = components?.url else { throw APIError.unknown }
 
-        var (data, status) = try await send(url: url, token: try await validToken())
+        var (data, status) = try await sendWithRetry(url: url)
 
         // The token can expire early; refresh once and retry.
         if status == 401 {
             token = nil
-            (data, status) = try await send(url: url, token: try await validToken())
+            (data, status) = try await sendWithRetry(url: url)
         }
 
         try check(status)
         do {
             return try Self.decoder.decode(T.self, from: data)
         } catch {
-            print("Petfinder decoding error for \(path): \(error)")
+            Log.network.error("Petfinder decoding error for \(path): \(String(describing: error))")
             throw APIError.decoding
         }
     }
 
     // MARK: - Private
+
+    /// Retries busy/server errors (429, 5xx) up to twice, waiting 1s then 2s.
+    private func sendWithRetry(url: URL) async throws -> (Data, Int) {
+        let retryable: Set<Int> = [429, 500, 502, 503, 504]
+        var attempt = 0
+        while true {
+            let (data, status) = try await send(url: url, token: try await validToken())
+            guard retryable.contains(status), attempt < 2 else { return (data, status) }
+            attempt += 1
+            Log.network.notice("Got \(status), retrying (attempt \(attempt))")
+            try await Task.sleep(for: .seconds(attempt))
+        }
+    }
 
     private func send(url: URL, token: String) async throws -> (Data, Int) {
         var request = URLRequest(url: url)
@@ -89,7 +102,12 @@ actor PetfinderClient {
         } catch let error as URLError
             where [.notConnectedToInternet, .networkConnectionLost, .timedOut].contains(error.code) {
             throw APIError.offline
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
+            Log.network.error("Request failed: \(error.localizedDescription)")
             throw APIError.unknown
         }
     }

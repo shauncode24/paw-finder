@@ -77,13 +77,98 @@ struct PetCard: View {
     }
 }
 
+/// A list row: small photo on the left, details on the right (list layout).
+struct PetRow: View {
+    let pet: Pet
+    var showsFavoriteButton = true
+
+    var body: some View {
+        HStack(spacing: Spacing.md) {
+            Color.clear
+                .frame(width: 72, height: 72)
+                .overlay { PetPhoto(url: pet.thumbnailURL, species: pet.species) }
+                .clipShape(RoundedRectangle(cornerRadius: Radius.medium))
+
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text(pet.name)
+                    .font(.pfHeadline)
+                    .foregroundStyle(Color.pfTextPrimary)
+                Text(pet.breed)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.pfTextSecondary)
+                    .lineLimit(1)
+                Text(pet.summary)
+                    .font(.pfCaption)
+                    .foregroundStyle(Color.pfTextSecondary)
+            }
+            Spacer(minLength: 0)
+            if showsFavoriteButton {
+                FavoriteButton(pet: pet)
+            }
+        }
+        .padding(Spacing.sm)
+        .background(Color.pfSurface, in: RoundedRectangle(cornerRadius: Radius.large))
+        .overlay {
+            RoundedRectangle(cornerRadius: Radius.large)
+                .stroke(Color.pfBorder, lineWidth: 1)
+        }
+    }
+}
+
 /// Grey placeholder card shown while the first page loads.
 struct SkeletonPetCard: View {
     var body: some View {
         PetCard(pet: MockPetRepository.samplePets[0], showsFavoriteButton: false)
             .redacted(reason: .placeholder)
+            .shimmering()
             .accessibilityLabel("Loading")
     }
+}
+
+/// Grey placeholder row for the list layout.
+struct SkeletonPetRow: View {
+    var body: some View {
+        PetRow(pet: MockPetRepository.samplePets[0], showsFavoriteButton: false)
+            .redacted(reason: .placeholder)
+            .shimmering()
+            .accessibilityLabel("Loading")
+    }
+}
+
+/// A soft light band that sweeps across loading placeholders.
+/// Turned off when the user has Reduce Motion on.
+private struct Shimmer: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var phase: CGFloat = -1
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if !reduceMotion {
+                    GeometryReader { proxy in
+                        LinearGradient(
+                            colors: [.clear, Color.pfSurfaceElevated.opacity(0.6), .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: proxy.size.width * 0.6)
+                        .offset(x: phase * proxy.size.width * 1.6)
+                    }
+                    .clipped()
+                    .allowsHitTesting(false)
+                }
+            }
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: false)) {
+                    phase = 1
+                }
+            }
+    }
+}
+
+extension View {
+    func shimmering() -> some View { modifier(Shimmer()) }
 }
 
 /// A titled, horizontally scrolling row of small pet cards.

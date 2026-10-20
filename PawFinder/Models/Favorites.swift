@@ -9,8 +9,20 @@ struct FavoritePet: Codable, Identifiable, Hashable {
     var statusChanged = false
     /// False when Petfinder no longer has the listing.
     var isListed = true
+    /// File name of the saved photo in `FavoritesStore.photosFolder`, once downloaded.
+    var localPhotoFile: String?
 
     var id: String { pet.id }
+
+    /// The saved photo on the device, if there is one.
+    var localPhotoURL: URL? {
+        guard let localPhotoFile else { return nil }
+        let url = FavoritesStore.photosFolder.appendingPathComponent(localPhotoFile)
+        return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    }
+
+    /// Saved photo if we have it (works offline), otherwise the online one.
+    var photoURL: URL? { localPhotoURL ?? pet.thumbnailURL }
 }
 
 /// A user-made group of favorites, like "Dogs for apartment" or "Maybe later".

@@ -7,6 +7,7 @@ struct PetDetailView: View {
     @State private var showReport = false
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
     @Environment(FavoritesStore.self) private var favorites
+    @Environment(LocationService.self) private var locationService
 
     private var pet: Pet { viewModel.pet }
 
@@ -27,10 +28,20 @@ struct PetDetailView: View {
                         FavoriteNotesSection(pet: pet)
                     }
                     about
+                    if let videos = pet.videoEmbeds, !videos.isEmpty {
+                        section("Videos") {
+                            ForEach(videos, id: \.self) { embed in
+                                PetVideoView(embedHTML: embed)
+                                    .frame(height: 200)
+                                    .clipShape(RoundedRectangle(cornerRadius: Radius.medium))
+                            }
+                        }
+                    }
                     goodWith
                     section("Shelter") {
                         ShelterCard(state: viewModel.shelterState,
                                     coordinate: viewModel.shelterCoordinate,
+                                    userLocation: locationService.lastLocation,
                                     pet: pet) {
                             Task { await viewModel.loadShelter() }
                         }
@@ -61,6 +72,10 @@ struct PetDetailView: View {
             ReportListingSheet(pet: pet)
         }
         .task { await viewModel.load() }
+        // Keep the saved favorite up to date with the fresh copy.
+        .onChange(of: viewModel.pet) { _, fresh in
+            favorites.updateSnapshot(fresh)
+        }
         .onAppear {
             recentlyViewed.add(pet)
             favorites.markStatusSeen(pet.id)
@@ -215,4 +230,5 @@ struct PetDetailView: View {
     }
     .environment(RecentlyViewedStore())
     .environment(FavoritesStore(fileName: "preview-favorites.json"))
+    .environment(LocationService())
 }

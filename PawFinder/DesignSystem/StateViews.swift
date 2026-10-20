@@ -23,10 +23,14 @@ struct EmptyStateView: View {
     var buttonTitle: String?
     var action: (() -> Void)?
 
+    /// Scales with Dynamic Type, like the text around it.
+    @ScaledMetric(relativeTo: .largeTitle) private var iconSize: CGFloat = 48
+
     var body: some View {
         VStack(spacing: Spacing.lg) {
             Image(systemName: icon)
-                .font(.system(size: 48))
+                .font(.system(size: iconSize))
+                .accessibilityHidden(true)
                 .foregroundStyle(Color.pfBrandLight)
             Text(title)
                 .font(.pfTitle)

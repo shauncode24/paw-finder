@@ -19,10 +19,14 @@ final class DiscoverViewModel {
     private(set) var state: State = .loading
     private(set) var pets: [Pet] = []
     private(set) var isLoadingMore = false
+    private(set) var loadMoreFailed = false
     private(set) var hasMore = false
+    /// Set when offline and showing saved results instead of fresh ones.
+    private(set) var cachedAt: Date?
 
     // Curated rails, shown when no search or filters are active.
     private(set) var newestPets: [Pet] = []
+    private(set) var newestTitle = "New today"
     private(set) var longestWaitingPets: [Pet] = []
 
     private let repository: PetRepository
@@ -30,7 +34,7 @@ final class DiscoverViewModel {
     private var loadedFilters: PetFilters?   // filters of what's currently on screen
     private var generation = 0               // bumps on every reload so stale "load more" results are dropped
     private var breeds: [(name: String, species: PetFilters.Species)] = []
-    private var railsLoaded = false
+    private var railsLocation: String?   // location the rails were loaded for
 
     private static let filtersKey = "discoverFilters"
 
@@ -69,6 +73,8 @@ final class DiscoverViewModel {
             pets = page.pets
             currentPage = page.currentPage
             hasMore = page.hasMore
+            cachedAt = page.cachedAt
+            loadMoreFailed = false
             loadedFilters = requested
             state = pets.isEmpty ? .empty : .loaded
         } catch {
@@ -83,6 +89,7 @@ final class DiscoverViewModel {
         guard hasMore, !isLoadingMore, let loadedFilters else { return }
         let startGeneration = generation
         isLoadingMore = true
+        loadMoreFailed = false
         defer { isLoadingMore = false }
 
         do {
@@ -93,19 +100,43 @@ final class DiscoverViewModel {
             pets += page.pets.filter { !existing.contains($0.id) }
             currentPage = page.currentPage
             hasMore = page.hasMore
+        } catch is CancellationError {
+            // Left the screen; nothing to show.
         } catch {
-            // Keep what's on screen; scrolling to the end again retries.
+            // Keep what's on screen and show a "Retry" row.
+            loadMoreFailed = startGeneration == generation
         }
     }
 
+    /// Loads the "New today" and "Longest waiting" rails near the chosen location.
+    /// Reloads only when the location changes.
     func loadRailsIfNeeded() async {
-        guard !railsLoaded else { return }
-        async let newest = repository.fetchPets(page: 1, filters: PetFilters(sort: .newest))
-        async let oldest = repository.fetchPets(page: 1, filters: PetFilters(sort: .longestWaiting))
+        guard railsLocation != filters.location || (newestPets.isEmpty && longestWaitingPets.isEmpty) else { return }
+        let location = filters.location
+
+        var base = PetFilters()
+        base.location = location
+        base.distance = filters.distance
+        var today = base
+        today.listed = .today
+        var oldest = base
+        oldest.sort = .longestWaiting
+
+        async let todayPage = repository.fetchPets(page: 1, filters: today)
+        async let oldestPage = repository.fetchPets(page: 1, filters: oldest)
         // Rails are extras: if they fail, just don't show them.
-        newestPets = Array(((try? await newest)?.pets ?? []).prefix(10))
-        longestWaitingPets = Array(((try? await oldest)?.pets ?? []).prefix(10))
-        railsLoaded = !newestPets.isEmpty || !longestWaitingPets.isEmpty
+        var newest = ((try? await todayPage)?.pets ?? [])
+        longestWaitingPets = Array(((try? await oldestPage)?.pets ?? []).prefix(10))
+
+        // Quiet day? Fall back to the newest pets overall.
+        if newest.isEmpty {
+            newest = (try? await repository.fetchPets(page: 1, filters: base).pets) ?? []
+            newestTitle = "Just added"
+        } else {
+            newestTitle = "New today"
+        }
+        newestPets = Array(newest.prefix(10))
+        railsLocation = location
     }
 
     // MARK: - Search & filters

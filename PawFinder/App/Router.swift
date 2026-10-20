@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum AppTab: Hashable, CaseIterable {
+enum AppTab: String, Hashable, CaseIterable {
     case discover, map, identify, favorites, profile
 
     var title: String {
@@ -27,7 +27,9 @@ enum AppTab: Hashable, CaseIterable {
 /// Every screen you can push onto a tab. Add cases as new screens are built.
 enum Route: Hashable {
     case petDetail(Pet)
+    case petID(String)        // from a link: loads the pet first
     case shelter(id: String)
+    case settings
     case designSystem
 }
 
@@ -43,5 +45,40 @@ final class Router {
 
     func popToRoot() {
         paths[selectedTab] = []
+    }
+
+    /// Switches to a tab and shows one screen on it.
+    func open(_ route: Route, in tab: AppTab) {
+        selectedTab = tab
+        paths[tab] = [route]
+    }
+
+    /// Handles deep links (from Safari, notifications, Spotlight):
+    ///
+    ///     pawfinder://pet/12345      a pet
+    ///     pawfinder://favorites      a tab (discover, map, identify, favorites, profile)
+    ///     pawfinder://settings       the Settings screen
+    ///
+    /// - Returns: false if the link wasn't recognized.
+    @discardableResult
+    func handle(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "pawfinder", let host = url.host()?.lowercased() else { return false }
+        let argument = url.pathComponents.first { $0 != "/" }
+
+        switch host {
+        case "pet":
+            guard let argument else { return false }
+            open(.petID(argument), in: .discover)
+        case "settings":
+            open(.settings, in: .profile)
+        default:
+            guard let tab = AppTab(rawValue: host) else {
+                Log.app.notice("Unknown deep link: \(url.absoluteString)")
+                return false
+            }
+            selectedTab = tab
+            paths[tab] = []
+        }
+        return true
     }
 }

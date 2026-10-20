@@ -27,4 +27,5 @@ struct RootView: View {
         .environment(Router())
         .environment(RecentlyViewedStore())
         .environment(FavoritesStore(fileName: "preview-favorites.json"))
+        .environment(LocationService())
 }

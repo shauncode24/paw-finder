@@ -17,16 +17,27 @@ struct RemotePetRepository: PetRepository {
 
     func fetchPets(page: Int, filters: PetFilters) async throws -> PetPage {
         var query = filters.queryItems
-        query["page"] = String(page)
-        query["limit"] = String(pageSize)
         query["status"] = "adoptable"
 
-        let response: PetfinderAnimalsResponse = try await client.get("animals", query: query)
-        return PetPage(
-            pets: response.animals.map { $0.toPet() },
-            currentPage: response.pagination.currentPage,
-            totalPages: response.pagination.totalPages
-        )
+        // The cache key leaves out page/limit, so each search has one saved first page.
+        let cacheKey = query
+        query["page"] = String(page)
+        query["limit"] = String(pageSize)
+
+        do {
+            let response: PetfinderAnimalsResponse = try await client.get("animals", query: query)
+            let pets = response.animals.map { $0.toPet() }
+            if page == 1 { PetCache.save(pets, for: cacheKey) }
+            return PetPage(
+                pets: pets,
+                currentPage: response.pagination.currentPage,
+                totalPages: response.pagination.totalPages
+            )
+        } catch APIError.offline where page == 1 {
+            // Offline: show the last saved results for this search, if any.
+            guard let cached = PetCache.load(for: cacheKey) else { throw APIError.offline }
+            return PetPage(pets: cached.pets, currentPage: 1, totalPages: 1, cachedAt: cached.savedAt)
+        }
     }
 
     func fetchPet(id: String) async throws -> Pet {
@@ -49,7 +60,7 @@ struct RemotePetRepository: PetRepository {
 enum PetRepositoryFactory {
     static func make() -> PetRepository {
         guard Secrets.hasPetfinderKeys else {
-            print("No Petfinder keys in Secrets.plist, so the app is using mock data.")
+            Log.app.info("No Petfinder keys in Secrets.plist, so the app is using mock data.")
             return MockPetRepository()
         }
         let client = PetfinderClient(apiKey: Secrets.petfinderAPIKey, apiSecret: Secrets.petfinderAPISecret)

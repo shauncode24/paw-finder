@@ -63,6 +63,12 @@ struct MockPetRepository: PetRepository {
         if filters.goodWithDogs, pet.goodWithDogs != true { return false }
         if filters.goodWithCats, pet.goodWithCats != true { return false }
         if filters.houseTrained, !pet.houseTrained { return false }
+        if filters.specialNeeds, !pet.specialNeeds { return false }
+        if !filters.coats.isEmpty, !filters.coats.map(\.rawValue).contains(pet.coat ?? "") { return false }
+        if let dateFilter = filters.listed.dateFilter, let published = pet.publishedAt {
+            if dateFilter.key == "after", published < dateFilter.date { return false }
+            if dateFilter.key == "before", published > dateFilter.date { return false }
+        }
         return true
     }
 
@@ -116,12 +122,14 @@ struct MockPetRepository: PetRepository {
                 houseTrained: index % 3 != 0,
                 specialNeeds: index == 7,
                 tags: ["Friendly", "Playful", "Gentle", "Curious"].shuffled().prefix(2).map { $0 },
-                publishedAt: Calendar.current.date(byAdding: .day, value: -index * 3, to: .now),
+                // Spread from today back to ~2 years ago, so every "time listed" filter has matches.
+                publishedAt: Calendar.current.date(byAdding: .day, value: -index * index, to: .now),
                 webURL: nil,
                 primaryBreed: breeds[index % breeds.count],
                 contactEmail: "adopt@example.com",
                 contactPhone: "(555) 555-01\(String(format: "%02d", index))",
-                status: "adoptable"
+                status: "adoptable",
+                coat: ["Short", "Medium", "Long"][index % 3]
             )
         }
     }()

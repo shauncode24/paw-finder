@@ -73,31 +73,47 @@ private struct ZoomableImage: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
 
+    @State private var containerSize: CGSize = .zero
+
     var body: some View {
-        AsyncImage(url: url) { phase in
-            if let image = phase.image {
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(scale)
-                    .offset(offset)
-                    .gesture(magnify)
-                    // Only grab drags while zoomed, so swiping between photos still works.
-                    .simultaneousGesture(scale > 1 ? pan : nil)
-                    .onTapGesture(count: 2) { toggleZoom() }
-            } else if phase.error != nil {
-                Image(systemName: "photo").foregroundStyle(.white)
-            } else {
-                ProgressView().tint(.white)
+        GeometryReader { proxy in
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(scale)
+                        .offset(offset)
+                        .gesture(magnify)
+                        // Only grab drags while zoomed, so swiping between photos still works.
+                        .simultaneousGesture(scale > 1 ? pan : nil)
+                        .onTapGesture(count: 2) { toggleZoom() }
+                } else if phase.error != nil {
+                    Image(systemName: "photo").foregroundStyle(.white)
+                } else {
+                    ProgressView().tint(.white)
+                }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .onAppear { containerSize = proxy.size }
+            .onChange(of: proxy.size) { _, size in containerSize = size }
         }
         .accessibilityLabel("Pet photo")
+    }
+
+    /// Keeps the zoomed photo covering the screen instead of sliding off it.
+    private func clamped(_ proposed: CGSize) -> CGSize {
+        let maxX = containerSize.width * (scale - 1) / 2
+        let maxY = containerSize.height * (scale - 1) / 2
+        return CGSize(width: min(max(proposed.width, -maxX), maxX),
+                      height: min(max(proposed.height, -maxY), maxY))
     }
 
     private var magnify: some Gesture {
         MagnifyGesture()
             .onChanged { value in
                 scale = min(max(lastScale * value.magnification, 1), 4)
+                offset = clamped(offset)
             }
             .onEnded { _ in
                 lastScale = scale
@@ -108,8 +124,8 @@ private struct ZoomableImage: View {
     private var pan: some Gesture {
         DragGesture()
             .onChanged { value in
-                offset = CGSize(width: lastOffset.width + value.translation.width,
-                                height: lastOffset.height + value.translation.height)
+                offset = clamped(CGSize(width: lastOffset.width + value.translation.width,
+                                        height: lastOffset.height + value.translation.height))
             }
             .onEnded { _ in lastOffset = offset }
     }

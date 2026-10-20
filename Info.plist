@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Extra Info.plist keys that can't be set as build settings.
+  Xcode merges this with the generated Info.plist (GENERATE_INFOPLIST_FILE = YES).
+  It lives outside the PawFinder/ folder so it isn't copied into the app as a resource.
+-->
+<plist version="1.0">
+<dict>
+	<!-- Deep links: pawfinder://pet/123, pawfinder://favorites, ... -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>PawFinder</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>pawfinder</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Background check for adopted favorites -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>pawfinder.refreshFavorites</string>
+	</array>
+</dict>
+</plist>

@@ -18,7 +18,12 @@ struct TabHomeView: View {
                 FavoritesView()
             case .profile:
                 List {
-                    NavigationLink("Design system", value: Route.designSystem)
+                    NavigationLink(value: Route.settings) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    NavigationLink(value: Route.designSystem) {
+                        Label("Design system", systemImage: "paintpalette")
+                    }
                 }
                 .scrollContentBackground(.hidden)
             }
@@ -38,6 +43,10 @@ struct RouteView: View {
         switch route {
         case .petDetail(let pet):
             PetDetailView(pet: pet, repository: petRepository)
+        case .petID(let id):
+            PetLoaderView(petID: id)
+        case .settings:
+            SettingsView()
         case .shelter(let id):
             EmptyStateView(icon: "house.fill", title: "Shelter", message: "Shelter \(id)")
                 .navigationTitle("Shelter")

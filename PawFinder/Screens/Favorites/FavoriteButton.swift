@@ -16,6 +16,10 @@ struct FavoriteButton: View {
 
         Button {
             favorites.toggle(pet)
+            if favorites.isFavorite(pet.id) {
+                // First favorite is a good moment to ask: we'll tell them if this pet gets adopted.
+                Task { await NotificationManager.shared.requestAuthorizationIfNeeded() }
+            }
         } label: {
             Image(systemName: isFavorite ? "heart.fill" : "heart")
                 .foregroundStyle(isFavorite ? Color.pfBrandPrimary : (style == .overlay ? Color.pfTextPrimary : Color.pfBrandPrimary))

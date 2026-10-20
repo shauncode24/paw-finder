@@ -12,12 +12,18 @@ final class PetDetailViewModel {
         case failed
     }
 
-    let pet: Pet
+    /// Starts as the copy from the grid, then gets replaced with fresh data.
+    private(set) var pet: Pet
     private(set) var shelterState: ShelterState = .loading
     private(set) var shelterCoordinate: CLLocationCoordinate2D?
     private(set) var similarPets: [Pet] = []
 
     private let repository: PetRepository
+
+    // Shared across detail screens so reopening a pet (or a pet from the same
+    // shelter) doesn't refetch or re-geocode.
+    private static var shelterCache: [String: Shelter] = [:]
+    private static var coordinateCache: [String: CLLocationCoordinate2D] = [:]
 
     init(pet: Pet, repository: PetRepository) {
         self.pet = pet
@@ -25,19 +31,38 @@ final class PetDetailViewModel {
     }
 
     func load() async {
+        async let refreshTask: Void = refreshPet()
         async let shelterTask: Void = loadShelter()
         async let similarTask: Void = loadSimilarPets()
-        _ = await (shelterTask, similarTask)
+        _ = await (refreshTask, shelterTask, similarTask)
+    }
+
+    /// Gets the latest data (e.g. status, photos) in case the saved copy is old.
+    /// Failing is fine: we keep showing what we have.
+    private func refreshPet() async {
+        guard var fresh = try? await repository.fetchPet(id: pet.id) else { return }
+        fresh.distance = fresh.distance ?? pet.distance   // single-pet requests have no distance
+        pet = fresh
     }
 
     func loadShelter() async {
-        shelterState = .loading
+        if let cached = Self.shelterCache[pet.shelterID] {
+            shelterState = .loaded(cached)
+            shelterCoordinate = Self.coordinateCache[pet.shelterID]
+            if shelterCoordinate != nil { return }
+        } else {
+            shelterState = .loading
+        }
         do {
             let shelter = try await repository.fetchShelter(id: pet.shelterID)
+            Self.shelterCache[pet.shelterID] = shelter
             shelterState = .loaded(shelter)
-            shelterCoordinate = await Self.coordinate(for: shelter.address)
+            if let coordinate = await Self.coordinate(for: shelter.address) {
+                Self.coordinateCache[pet.shelterID] = coordinate
+                shelterCoordinate = coordinate
+            }
         } catch {
-            shelterState = .failed
+            if Self.shelterCache[pet.shelterID] == nil { shelterState = .failed }
         }
     }
 

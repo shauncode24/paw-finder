@@ -143,7 +143,7 @@ private struct FavoriteRow: View {
         HStack(spacing: Spacing.md) {
             Color.clear
                 .frame(width: 64, height: 64)
-                .overlay { PetPhoto(url: favorite.pet.thumbnailURL, species: favorite.pet.species) }
+                .overlay { PetPhoto(url: favorite.photoURL, species: favorite.pet.species) }
                 .clipShape(RoundedRectangle(cornerRadius: Radius.medium))
 
             VStack(alignment: .leading, spacing: Spacing.xs) {

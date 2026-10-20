@@ -4,6 +4,7 @@ import SwiftUI
 struct DiscoverView: View {
     @State private var viewModel: DiscoverViewModel
     @State private var showFilters = false
+    @AppStorage("discoverShowsList") private var showsList = false
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: Spacing.md)]
@@ -17,14 +18,18 @@ struct DiscoverView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
+                if let cachedAt = viewModel.cachedAt {
+                    offlineBanner(cachedAt)
+                }
+
                 activeFilterChips
 
-                if viewModel.filters.isDefault {
+                if viewModel.filters.isBrowsing {
                     rails
                 }
 
                 VStack(alignment: .leading, spacing: Spacing.md) {
-                    Text(viewModel.filters.isDefault ? "All pets" : "Results")
+                    Text(viewModel.filters.isBrowsing ? "All pets" : "Results")
                         .font(.pfTitle)
                         .foregroundStyle(Color.pfTextPrimary)
                     results
@@ -46,6 +51,14 @@ struct DiscoverView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
+                    withAnimation { showsList.toggle() }
+                } label: {
+                    Image(systemName: showsList ? "square.grid.2x2" : "list.bullet")
+                }
+                .accessibilityLabel(showsList ? "Show as grid" : "Show as list")
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
                     showFilters = true
                 } label: {
                     Image(systemName: viewModel.filters.activeCount > 0
@@ -62,7 +75,7 @@ struct DiscoverView: View {
         .refreshable { await viewModel.reload() }
         .task(id: viewModel.filters) { await viewModel.filtersChanged() }
         .task(id: viewModel.filters.species) { await viewModel.loadBreeds() }
-        .task { await viewModel.loadRailsIfNeeded() }
+        .task(id: viewModel.filters.location) { await viewModel.loadRailsIfNeeded() }
     }
 
     // MARK: - Sections
@@ -71,8 +84,14 @@ struct DiscoverView: View {
     private var results: some View {
         switch viewModel.state {
         case .loading:
-            LazyVGrid(columns: columns, spacing: Spacing.md) {
-                ForEach(0..<6, id: \.self) { _ in SkeletonPetCard() }
+            if showsList {
+                LazyVStack(spacing: Spacing.sm) {
+                    ForEach(0..<6, id: \.self) { _ in SkeletonPetRow() }
+                }
+            } else {
+                LazyVGrid(columns: columns, spacing: Spacing.md) {
+                    ForEach(0..<6, id: \.self) { _ in SkeletonPetCard() }
+                }
             }
         case .empty:
             EmptyStateView(icon: "magnifyingglass", title: "No matches",
@@ -85,23 +104,54 @@ struct DiscoverView: View {
             }
             .frame(minHeight: 300)
         case .loaded:
-            LazyVGrid(columns: columns, spacing: Spacing.md) {
-                ForEach(viewModel.pets) { pet in
-                    NavigationLink(value: Route.petDetail(pet)) {
-                        PetCard(pet: pet)
+            if showsList {
+                LazyVStack(spacing: Spacing.sm) {
+                    ForEach(viewModel.pets) { pet in
+                        petLink(pet) { PetRow(pet: pet) }
                     }
-                    .buttonStyle(.plain)
-                    .onAppear {
-                        if pet.id == viewModel.pets.last?.id {
-                            Task { await viewModel.loadMore() }
-                        }
+                }
+            } else {
+                LazyVGrid(columns: columns, spacing: Spacing.md) {
+                    ForEach(viewModel.pets) { pet in
+                        petLink(pet) { PetCard(pet: pet) }
                     }
                 }
             }
             if viewModel.isLoadingMore {
                 ProgressView().frame(maxWidth: .infinity)
+            } else if viewModel.loadMoreFailed {
+                HStack {
+                    Text("Couldn't load more pets.")
+                        .foregroundStyle(Color.pfTextSecondary)
+                    Button("Retry") { Task { await viewModel.loadMore() } }
+                }
+                .font(.subheadline)
+                .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    /// Opens the pet, and loads the next page when the last one appears.
+    private func petLink(_ pet: Pet, @ViewBuilder label: () -> some View) -> some View {
+        NavigationLink(value: Route.petDetail(pet)) {
+            label()
+        }
+        .buttonStyle(.plain)
+        .onAppear {
+            if pet.id == viewModel.pets.last?.id {
+                Task { await viewModel.loadMore() }
+            }
+        }
+    }
+
+    private func offlineBanner(_ date: Date) -> some View {
+        Label("You're offline. Showing pets saved \(date.formatted(.relative(presentation: .named))).",
+              systemImage: "wifi.slash")
+            .font(.subheadline)
+            .foregroundStyle(Color.pfTextPrimary)
+            .padding(Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.pfBrandDeep, in: RoundedRectangle(cornerRadius: Radius.medium))
     }
 
     @ViewBuilder
@@ -110,7 +160,7 @@ struct DiscoverView: View {
             PetRail(title: "Recently viewed", pets: recentlyViewed.pets)
         }
         if !viewModel.newestPets.isEmpty {
-            PetRail(title: "Just added", pets: viewModel.newestPets)
+            PetRail(title: viewModel.newestTitle, pets: viewModel.newestPets)
         }
         if !viewModel.longestWaitingPets.isEmpty {
             PetRail(title: "Longest waiting", pets: viewModel.longestWaitingPets)
@@ -163,8 +213,18 @@ struct DiscoverView: View {
         if filters.goodWithDogs { chips.append(("Good with dogs", { $0.goodWithDogs = false })) }
         if filters.goodWithCats { chips.append(("Good with cats", { $0.goodWithCats = false })) }
         if filters.houseTrained { chips.append(("House-trained", { $0.houseTrained = false })) }
+        if filters.specialNeeds { chips.append(("Special needs", { $0.specialNeeds = false })) }
+        for coat in PetFilters.Coat.allCases where filters.coats.contains(coat) {
+            chips.append(("\(coat.rawValue) coat", { $0.coats.remove(coat) }))
+        }
+        if filters.listed != .any {
+            chips.append((filters.listed.rawValue, { $0.listed = .any }))
+        }
         if !filters.location.isEmpty {
-            chips.append(("Within \(filters.distance) mi of \(filters.location)", { $0.location = "" }))
+            chips.append(("Within \(filters.distance) mi of \(filters.locationLabel)", {
+                $0.location = ""
+                $0.locationName = nil
+            }))
         }
         return chips
     }
@@ -178,4 +238,5 @@ struct DiscoverView: View {
     }
     .environment(RecentlyViewedStore())
     .environment(FavoritesStore(fileName: "preview-favorites.json"))
+    .environment(LocationService())
 }

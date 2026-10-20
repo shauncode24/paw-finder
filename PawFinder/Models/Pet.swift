@@ -33,6 +33,10 @@ struct Pet: Identifiable, Hashable, Codable {
     // Added in Phase 4.
     var status: String? = nil         // Petfinder: "adoptable", "adopted", "found"
 
+    // Added with the scope bump.
+    var coat: String? = nil           // "Short", "Medium", "Long", "Wire", "Hairless", "Curly"
+    var videoEmbeds: [String]? = nil  // HTML <iframe> snippets from Petfinder
+
     var isAdopted: Bool { status?.lowercased() == "adopted" }
 
     /// "Young · Male · Medium", for list rows.
@@ -46,6 +50,8 @@ struct PetPage {
     let pets: [Pet]
     let currentPage: Int
     let totalPages: Int
+    /// Set when these pets came from the offline cache instead of the network.
+    var cachedAt: Date? = nil
 
     var hasMore: Bool { currentPage < totalPages }
 }
