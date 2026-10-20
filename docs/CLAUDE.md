@@ -1,0 +1,25 @@
+# PawFinder
+
+Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list and phase plan: @docs/SPEC.md. Colors (light and dark): @docs/DESIGN.md. Setup: @docs/SETUP.md.
+
+**Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
+
+## Current phase
+Phase 0 done (update this line as phases complete)
+
+## Setup
+- One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, and add `Models/`, `Services/` when needed.
+- The Xcode project uses folder-synchronized groups, so new files in `PawFinder/` are picked up automatically.
+- iOS 17+, SwiftUI, `@Observable` view models, async/await. Swift 5 language mode.
+- Navigation: `Router` (selected tab + a `[Route]` path per tab). Add `Route` cases for new screens.
+- Keys live in `PawFinder/Config/Secrets.plist` (gitignored) and are read through `Secrets`.
+- Firebase goes in when a phase needs it (via Swift Package Manager in Xcode).
+
+## Rules
+- Build only the current phase.
+- Use the `Color.pf*` colors, `Spacing`, `Radius`, and `PF*` components from `DesignSystem/`; no raw colors.
+- Screens should handle loading, empty, and error states (`LoadingView`, `EmptyStateView`, `ErrorView`).
+- Avoid force-unwraps.
+- Never commit keys.
+- Ask before adding dependencies.
+- Don't run git commands; the user handles git.

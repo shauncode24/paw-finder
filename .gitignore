@@ -1,0 +1,14 @@
+# Keys (never commit)
+PawFinder/Config/Secrets.plist
+GoogleService-Info.plist
+
+# Xcode
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+desktop.ini
