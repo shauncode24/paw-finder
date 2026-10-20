@@ -21,6 +21,11 @@ struct PetfinderOrganizationResponse: Decodable {
     let organization: PetfinderOrganization
 }
 
+struct PetfinderOrganizationsResponse: Decodable {
+    let organizations: [PetfinderOrganization]
+    let pagination: PetfinderAnimalsResponse.Pagination
+}
+
 struct PetfinderOrganization: Decodable {
     let id: String
     let name: String?
@@ -29,6 +34,16 @@ struct PetfinderOrganization: Decodable {
     let address: PetfinderAddress?
     let url: String?       // Petfinder page
     let website: String?   // shelter's own site (often blank)
+    let missionStatement: String?
+    let hours: [String: String?]?
+    let photos: [PetfinderAnimal.Photo]?
+    let distance: Double?
+    let adoption: Adoption?
+
+    struct Adoption: Decodable {
+        let policy: String?
+        let url: String?
+    }
 
     func toShelter() -> Shelter {
         Shelter(
@@ -37,9 +52,25 @@ struct PetfinderOrganization: Decodable {
             email: email,
             phone: phone,
             address: address?.formatted ?? "",
-            website: website.flatMap(URL.init(string:)).flatMap { $0.scheme == nil ? nil : $0 },
-            petfinderURL: url.flatMap(URL.init(string:))
+            website: Self.webURL(website),
+            petfinderURL: url.flatMap(URL.init(string:)),
+            city: address?.city,
+            state: address?.state,
+            postcode: address?.postcode,
+            missionStatement: missionStatement?.htmlDecoded,
+            hours: (hours ?? [:]).compactMapValues { $0 }.filter { !$0.value.isEmpty },
+            photoURLs: (photos ?? []).compactMap { $0.large ?? $0.full ?? $0.medium },
+            distance: distance,
+            adoptionPolicy: adoption?.policy?.htmlDecoded,
+            adoptionURL: Self.webURL(adoption?.url)
         )
+    }
+
+    /// Shelters often type "www.example.org" without https://.
+    private static func webURL(_ text: String?) -> URL? {
+        guard let text = text?.trimmingCharacters(in: .whitespaces), !text.isEmpty else { return nil }
+        let withScheme = text.lowercased().hasPrefix("http") ? text : "https://\(text)"
+        return URL(string: withScheme)
     }
 }
 
@@ -130,7 +161,7 @@ struct PetfinderAnimal: Decodable {
             age: age ?? "",
             gender: gender ?? "",
             size: size ?? "",
-            description: description.map(Self.decodeEntities),
+            description: description?.htmlDecoded,
             photoURLs: (photos ?? []).compactMap { $0.large ?? $0.full ?? $0.medium },
             // "medium" is ~300px wide: small enough for grid cells, so we never
             // decode full-size photos just to show a thumbnail.
@@ -171,10 +202,12 @@ struct PetfinderAnimal: Decodable {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
         return formatter
     }()
+}
 
-    /// Petfinder descriptions contain HTML entities like `&amp;` and `&#039;`.
-    private static func decodeEntities(_ text: String) -> String {
+extension String {
+    /// Petfinder text contains HTML entities like `&amp;` and `&#039;`.
+    var htmlDecoded: String {
         [("&amp;", "&"), ("&#039;", "'"), ("&quot;", "\""), ("&lt;", "<"), ("&gt;", ">"), ("&nbsp;", " ")]
-            .reduce(text) { $0.replacingOccurrences(of: $1.0, with: $1.1) }
+            .reduce(self) { $0.replacingOccurrences(of: $1.0, with: $1.1) }
     }
 }

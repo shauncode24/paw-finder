@@ -11,13 +11,16 @@ struct TabHomeView: View {
             case .discover:
                 DiscoverView(repository: petRepository)
             case .map:
-                EmptyStateView(icon: "map", title: "Shelters near you", message: "Coming in Phase 5.")
+                ShelterMapView(repository: petRepository)
             case .identify:
                 EmptyStateView(icon: "camera.viewfinder", title: "Identify a breed", message: "Coming in Phase 6.")
             case .favorites:
                 FavoritesView()
             case .profile:
                 List {
+                    NavigationLink(value: Route.followedShelters) {
+                        Label("Followed shelters", systemImage: "star")
+                    }
                     NavigationLink(value: Route.settings) {
                         Label("Settings", systemImage: "gearshape")
                     }
@@ -48,8 +51,9 @@ struct RouteView: View {
         case .settings:
             SettingsView()
         case .shelter(let id):
-            EmptyStateView(icon: "house.fill", title: "Shelter", message: "Shelter \(id)")
-                .navigationTitle("Shelter")
+            ShelterProfileView(shelterID: id, repository: petRepository)
+        case .followedShelters:
+            FollowedSheltersView()
         case .designSystem:
             DesignSystemPreviewView()
         }

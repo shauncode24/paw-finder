@@ -19,6 +19,7 @@ struct PetFilters: Codable, Equatable {
     var locationName: String?        // shown instead of `location`, e.g. "Current location"
     var distance = 50                // miles, only used with a location
     var sort: Sort = .newest
+    var shelterID: String?           // only this shelter's pets (shelter profile)
 
     enum Species: String, Codable, CaseIterable {
         case dog = "Dog", cat = "Cat", rabbit = "Rabbit", bird = "Bird"
@@ -122,6 +123,7 @@ struct PetFilters: Codable, Equatable {
         if !trimmedName.isEmpty { query["name"] = trimmedName }
         if let species { query["type"] = species.rawValue }
         if let breed { query["breed"] = breed }
+        if let shelterID { query["organization"] = shelterID }
         if !ages.isEmpty { query["age"] = ages.map { $0.rawValue.lowercased() }.sorted().joined(separator: ",") }
         if !sizes.isEmpty { query["size"] = sizes.map(\.apiValue).sorted().joined(separator: ",") }
         if let gender { query["gender"] = gender.rawValue.lowercased() }

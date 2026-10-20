@@ -47,6 +47,23 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
+    /// "3 new pets at Austin Animal Center" for each followed shelter with new listings.
+    func notifyNewArrivals(_ arrivals: [FollowedSheltersStore.NewArrivals]) async {
+        guard await authorizationStatus() == .authorized else { return }
+        for arrival in arrivals {
+            let content = UNMutableNotificationContent()
+            let count = arrival.pets.count
+            content.title = count == 1 ? "New pet at \(arrival.shelter.name)" : "\(count) new pets at \(arrival.shelter.name)"
+            content.body = arrival.pets.prefix(3).map(\.name).joined(separator: ", ")
+                + (count > 3 ? " and more" : "") + " just arrived."
+            content.sound = .default
+            content.userInfo = ["url": "pawfinder://shelter/\(arrival.shelter.id)"]
+
+            let request = UNNotificationRequest(identifier: "arrivals-\(arrival.shelter.id)", content: content, trigger: nil)
+            try? await center.add(request)
+        }
+    }
+
     // MARK: - UNUserNotificationCenterDelegate
 
     /// Show banners even when the app is open.

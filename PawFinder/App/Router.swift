@@ -29,6 +29,7 @@ enum Route: Hashable {
     case petDetail(Pet)
     case petID(String)        // from a link: loads the pet first
     case shelter(id: String)
+    case followedShelters
     case settings
     case designSystem
 }
@@ -56,6 +57,7 @@ final class Router {
     /// Handles deep links (from Safari, notifications, Spotlight):
     ///
     ///     pawfinder://pet/12345      a pet
+    ///     pawfinder://shelter/NJ333  a shelter profile
     ///     pawfinder://favorites      a tab (discover, map, identify, favorites, profile)
     ///     pawfinder://settings       the Settings screen
     ///
@@ -69,6 +71,9 @@ final class Router {
         case "pet":
             guard let argument else { return false }
             open(.petID(argument), in: .discover)
+        case "shelter":
+            guard let argument else { return false }
+            open(.shelter(id: argument), in: .map)
         case "settings":
             open(.settings, in: .profile)
         default:

@@ -59,7 +59,6 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Full description | Petfinder's API only returns a short preview; "Read more" plus "View full listing on Petfinder" | No fix; this is a Petfinder limitation |
 | Actions: apply, message shelter | Not on the detail screen yet | Phase 9 (apply), Phase 10 (message) |
 | Compatibility score with your lifestyle | Not shown | Phase 12 (needs the lifestyle questionnaire from Phase 7) |
-| Shelter profile page (tapping the shelter) | Shelter card with name, address, mini-map, call/email/website/directions; `Route.shelter` is still a placeholder | Phase 5 |
 | Report listing sent to a moderator *(server)* | Saved on the device only (`UserDefaults` key `listingReports`) | Write to a Firestore `reports` collection once Firebase is added |
 | Momentum when dragging a zoomed photo | Drag stops when your finger lifts | Animate the offset with the drag's predicted end |
 
@@ -74,7 +73,24 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Reordering inside a collection from the detail screen | Reorder from the Favorites tab (Edit button) | Fine as is |
 | Tests for the store *(tests)* | None | Test `FavoritesStore` with a temporary `fileName` |
 
-## Later phases (5 onwards)
+## Phase 5: Location, Map & Shelters
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| Continuous location updates (`AsyncStream`) | `LocationService` gets the location once when asked; the map's blue dot (`UserAnnotation`) tracks you by itself | Wrap `CLLocationUpdate.liveUpdates()` if a feature needs live tracking |
+| MapKit's built-in clustering | A simple grid clustering (`ShelterCluster.make`) that regroups when the map stops moving | `MKMapView` in a `UIViewRepresentable` with `clusteringIdentifier` |
+| Exact shelter coordinates | Petfinder doesn't send coordinates, so addresses are looked up with Apple's geocoder (saved to disk). Pins appear gradually; a shelter whose address can't be found has no pin (it's still in the list view) | No fix without coordinates from the API |
+| Big result pages | 25 shelters per search ("Load more" in the list view), because each needs geocoding and Apple limits lookups to ~50/min | Fine as is |
+| Filter shelters by which animals they have | Chips for distance, "Open now", and "Following" | Petfinder doesn't say which species a shelter has without fetching its pets |
+| Volunteer and donation links | Website, adoption policy, and Petfinder page links | Petfinder doesn't provide these; show the shelter's social links (`social_media` in the API) |
+| Shelter photo gallery | First photo as the header | Reuse `PhotoCarousel` |
+| Accurate "open now" | Best-effort reading of the free-text hours ("9-5", "10am-6pm", "Closed"), using the phone's time zone | Unreadable hours show nothing rather than a wrong answer |
+| Push notifications for new arrivals *(server)* | Local notifications from the background check (iOS decides when it runs) | Phase 11 |
+| Geofencing (optional in SPEC) | None | `CLMonitor` with a region around followed shelters |
+| Offline shelter search | Shelter results aren't cached (shelter profiles and coordinates are) | Save the last results like `PetCache` |
+| Mock data respects the searched location | Sample data always returns all 8 shelters; the map zooms out to fit them | Fine for testing |
+
+## Later phases (6 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
@@ -111,4 +127,4 @@ These were on this list and are now in the app:
 
 ---
 
-**Not yet verified:** Phases 0–4 and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–5 and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

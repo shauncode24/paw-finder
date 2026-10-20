@@ -7,6 +7,7 @@ struct PawFinderApp: App {
     @State private var recentlyViewed = RecentlyViewedStore()
     @State private var favorites = FavoritesStore()
     @State private var locationService = LocationService()
+    @State private var followedShelters = FollowedSheltersStore()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
     @Environment(\.scenePhase) private var scenePhase
     private let petRepository = PetRepositoryFactory.make()
@@ -29,6 +30,7 @@ struct PawFinderApp: App {
                 .environment(recentlyViewed)
                 .environment(favorites)
                 .environment(locationService)
+                .environment(followedShelters)
                 .environment(\.petRepository, petRepository)
                 .tint(.pfBrandPrimary)
                 .preferredColorScheme(appearance.colorScheme)
@@ -43,7 +45,8 @@ struct PawFinderApp: App {
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { BackgroundRefresh.schedule() }
         }
-        // iOS wakes the app in the background now and then: check favorites for adoptions.
+        // iOS wakes the app in the background now and then: check favorites for
+        // adoptions and followed shelters for new pets.
         .backgroundTask(.appRefresh(BackgroundRefresh.identifier)) {
             await checkFavoritesInBackground()
         }
@@ -53,5 +56,7 @@ struct PawFinderApp: App {
         BackgroundRefresh.schedule()   // ask for the next one
         let changed = await favorites.refreshStatuses(using: petRepository, force: true)
         await NotificationManager.shared.notifyStatusChanges(changed)
+        let arrivals = await followedShelters.checkNewArrivals(using: petRepository)
+        await NotificationManager.shared.notifyNewArrivals(arrivals)
     }
 }

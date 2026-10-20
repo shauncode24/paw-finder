@@ -23,7 +23,6 @@ final class PetDetailViewModel {
     // Shared across detail screens so reopening a pet (or a pet from the same
     // shelter) doesn't refetch or re-geocode.
     private static var shelterCache: [String: Shelter] = [:]
-    private static var coordinateCache: [String: CLLocationCoordinate2D] = [:]
 
     init(pet: Pet, repository: PetRepository) {
         self.pet = pet
@@ -48,7 +47,7 @@ final class PetDetailViewModel {
     func loadShelter() async {
         if let cached = Self.shelterCache[pet.shelterID] {
             shelterState = .loaded(cached)
-            shelterCoordinate = Self.coordinateCache[pet.shelterID]
+            shelterCoordinate = ShelterGeocoder.shared.cachedCoordinate(for: pet.shelterID)
             if shelterCoordinate != nil { return }
         } else {
             shelterState = .loading
@@ -57,10 +56,7 @@ final class PetDetailViewModel {
             let shelter = try await repository.fetchShelter(id: pet.shelterID)
             Self.shelterCache[pet.shelterID] = shelter
             shelterState = .loaded(shelter)
-            if let coordinate = await Self.coordinate(for: shelter.address) {
-                Self.coordinateCache[pet.shelterID] = coordinate
-                shelterCoordinate = coordinate
-            }
+            shelterCoordinate = await ShelterGeocoder.shared.coordinate(for: shelter)
         } catch {
             if Self.shelterCache[pet.shelterID] == nil { shelterState = .failed }
         }
@@ -81,12 +77,5 @@ final class PetDetailViewModel {
             results += more.filter { $0.id != pet.id && !existing.contains($0.id) }
         }
         similarPets = Array(results.prefix(10))
-    }
-
-    /// Turns a street address into map coordinates using Apple's geocoder.
-    private static func coordinate(for address: String) async -> CLLocationCoordinate2D? {
-        guard !address.isEmpty else { return nil }
-        let placemarks = try? await CLGeocoder().geocodeAddressString(address)
-        return placemarks?.first?.location?.coordinate
     }
 }

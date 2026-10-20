@@ -43,6 +43,11 @@ struct MockPetRepository: PetRepository {
         return shelter
     }
 
+    func fetchShelters(near location: String, distance: Int, page: Int) async throws -> ShelterPage {
+        try await Task.sleep(for: delay)
+        return ShelterPage(shelters: page == 1 ? Self.sampleShelters : [], currentPage: page, totalPages: 1)
+    }
+
     func fetchBreeds(for species: PetFilters.Species) async throws -> [String] {
         switch species {
         case .dog: Self.dogBreeds
@@ -56,6 +61,7 @@ struct MockPetRepository: PetRepository {
         if !name.isEmpty, !pet.name.localizedCaseInsensitiveContains(name) { return false }
         if let species = filters.species, pet.species != species.rawValue { return false }
         if let breed = filters.breed, !pet.breed.localizedCaseInsensitiveContains(breed) { return false }
+        if let shelterID = filters.shelterID, pet.shelterID != shelterID { return false }
         if !filters.ages.isEmpty, !filters.ages.map(\.rawValue).contains(pet.age) { return false }
         if !filters.sizes.isEmpty, !filters.sizes.map(\.rawValue).contains(pet.size) { return false }
         if let gender = filters.gender, pet.gender != gender.rawValue { return false }
@@ -77,17 +83,33 @@ struct MockPetRepository: PetRepository {
     static let dogBreeds = ["Beagle", "Labrador Retriever", "German Shepherd Dog", "Golden Retriever", "Pit Bull Terrier"]
     static let catBreeds = ["Domestic Short Hair", "Siamese", "Maine Coon", "Tabby", "Persian"]
 
-    static let sampleShelters: [Shelter] = [
-        Shelter(id: "shelter-1", name: "Austin Animal Center", email: "adopt@example.com", phone: "(512) 555-0101",
-                address: "7201 Levander Loop, Austin, TX 78702", website: URL(string: "https://www.austintexas.gov/austin-animal-center"),
-                petfinderURL: nil),
-        Shelter(id: "shelter-2", name: "Denver Animal Shelter", email: "adopt@example.com", phone: "(720) 555-0102",
-                address: "1241 W Bayaud Ave, Denver, CO 80223", website: nil, petfinderURL: nil),
-        Shelter(id: "shelter-3", name: "Portland Pet Rescue", email: nil, phone: "(503) 555-0103",
-                address: "1067 NE Columbia Blvd, Portland, OR 97211", website: nil, petfinderURL: nil),
-        Shelter(id: "shelter-4", name: "Chicago Paws Rescue", email: "hello@example.com", phone: nil,
-                address: "2741 S Western Ave, Chicago, IL 60608", website: nil, petfinderURL: nil),
-    ]
+    static let sampleShelters: [Shelter] = {
+        let weekdayHours = ["monday": "11:00 AM - 7:00 PM", "tuesday": "11:00 AM - 7:00 PM",
+                            "wednesday": "11:00 AM - 7:00 PM", "thursday": "11:00 AM - 7:00 PM",
+                            "friday": "11:00 AM - 7:00 PM", "saturday": "10am-5pm", "sunday": "Closed"]
+        let everyDay = Dictionary(uniqueKeysWithValues: Shelter.weekdays.map { ($0, "9-5") })
+        func shelter(_ number: Int, _ name: String, _ street: String, _ city: String, _ state: String, _ zip: String,
+                     email: String? = "adopt@example.com", phone: String? = nil, hours: [String: String]) -> Shelter {
+            Shelter(id: "shelter-\(number)", name: name, email: email, phone: phone ?? "(555) 555-02\(number)0",
+                    address: "\(street), \(city), \(state) \(zip)", website: URL(string: "https://example.com"),
+                    petfinderURL: nil, city: city, state: state, postcode: zip,
+                    missionStatement: "\(name) finds loving homes for dogs and cats in the \(city) area. "
+                        + "We're run by volunteers and every adoption fee goes straight back into caring for our animals.",
+                    hours: hours,
+                    adoptionPolicy: "Adopters must be 18+, fill in an application, and meet the pet before adopting.",
+                    adoptionURL: URL(string: "https://example.com/adopt"))
+        }
+        return [
+            shelter(1, "Austin Animal Center", "7201 Levander Loop", "Austin", "TX", "78702", hours: weekdayHours),
+            shelter(2, "Denver Animal Shelter", "1241 W Bayaud Ave", "Denver", "CO", "80223", hours: everyDay),
+            shelter(3, "Portland Pet Rescue", "1067 NE Columbia Blvd", "Portland", "OR", "97211", email: nil, hours: weekdayHours),
+            shelter(4, "Chicago Paws Rescue", "2741 S Western Ave", "Chicago", "IL", "60608", phone: nil, hours: [:]),
+            shelter(5, "Raleigh Rescue League", "820 Beacon Lake Dr", "Raleigh", "NC", "27610", hours: everyDay),
+            shelter(6, "Austin Pets Alive!", "1156 W Cesar Chavez St", "Austin", "TX", "78703", hours: weekdayHours),
+            shelter(7, "Denver Dumb Friends League", "2080 S Quebec St", "Denver", "CO", "80231", hours: everyDay),
+            shelter(8, "Oregon Humane Society", "1067 NE Columbia Blvd", "Portland", "OR", "97211", hours: weekdayHours),
+        ]
+    }()
 
     static let samplePets: [Pet] = {
         let names = ["Biscuit", "Luna", "Milo", "Bella", "Charlie", "Nala", "Oliver", "Daisy", "Max", "Coco",
@@ -95,11 +117,11 @@ struct MockPetRepository: PetRepository {
                      "Ziggy", "Hazel", "Bear", "Olive", "Tucker"]
         let ages = ["Baby", "Young", "Adult", "Senior"]
         let sizes = ["Small", "Medium", "Large"]
-        let cities = ["Austin, TX", "Denver, CO", "Portland, OR", "Chicago, IL", "Raleigh, NC"]
 
         return names.enumerated().map { index, name in
             let isDog = index % 3 != 2
             let breeds = isDog ? dogBreeds : catBreeds
+            let shelter = sampleShelters[index % sampleShelters.count]
             return Pet(
                 id: "mock-\(index + 1)",
                 name: name,
@@ -113,9 +135,9 @@ struct MockPetRepository: PetRepository {
                     + "Ask the shelter about a meet-and-greet to see if \(name) is the right fit for your family.",
                 photoURLs: [],
                 thumbnailURL: nil,
-                location: cities[index % cities.count],
+                location: shelter.cityState,
                 distance: nil,
-                shelterID: "shelter-\(index % 4 + 1)",
+                shelterID: shelter.id,
                 goodWithKids: index % 4 == 3 ? nil : index % 4 != 1,
                 goodWithDogs: isDog ? true : nil,
                 goodWithCats: isDog ? index.isMultiple(of: 2) : true,

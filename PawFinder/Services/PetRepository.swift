@@ -8,6 +8,8 @@ protocol PetRepository {
     /// All breed names for a species, for search suggestions.
     func fetchBreeds(for species: PetFilters.Species) async throws -> [String]
     func fetchShelter(id: String) async throws -> Shelter
+    /// Shelters near a ZIP, "City, ST", or "lat,long", nearest first.
+    func fetchShelters(near location: String, distance: Int, page: Int) async throws -> ShelterPage
 }
 
 /// Real data from Petfinder.
@@ -53,6 +55,22 @@ struct RemotePetRepository: PetRepository {
     func fetchShelter(id: String) async throws -> Shelter {
         let response: PetfinderOrganizationResponse = try await client.get("organizations/\(id)")
         return response.organization.toShelter()
+    }
+
+    func fetchShelters(near location: String, distance: Int, page: Int) async throws -> ShelterPage {
+        let query = [
+            "location": location,
+            "distance": String(distance),
+            "sort": "distance",
+            "limit": "25",   // each one needs geocoding, so keep pages small
+            "page": String(page),
+        ]
+        let response: PetfinderOrganizationsResponse = try await client.get("organizations", query: query)
+        return ShelterPage(
+            shelters: response.organizations.map { $0.toShelter() },
+            currentPage: response.pagination.currentPage,
+            totalPages: response.pagination.totalPages
+        )
     }
 }
 

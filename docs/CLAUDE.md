@@ -5,7 +5,7 @@ Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list 
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
 ## Current phase
-Phase 4 done + scope bump from Leftover.md (update this line as phases complete)
+Phase 5 done (update this line as phases complete)
 
 ## Setup
 - One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, `Models/`, `Services/`.
@@ -25,6 +25,7 @@ Phase 4 done + scope bump from Leftover.md (update this line as phases complete)
 - Logging: use `Log.app/network/storage/location/notifications` (os.Logger), not `print`.
 - Deep links: `Router.handle(url)` (`pawfinder://pet/<id>`, `pawfinder://<tab>`, `pawfinder://settings`). `Route.petID` → `PetLoaderView` (uses the saved favorite first).
 - Services in the environment: `Router`, `RecentlyViewedStore`, `FavoritesStore`, `LocationService`, `\.petRepository`. `NotificationManager.shared` (local notifications), `SpotlightIndexer`, `BackgroundRefresh`, `PetCache` (offline first page per search).
+- Shelters (`Screens/Map/`, `Screens/Shelters/`): `ShelterMapView` + `ShelterMapViewModel` (search by GPS/ZIP/"Search this area", grid clustering via `ShelterCluster`, list mode). `ShelterProfileView` (`Route.shelter(id:)`). `ShelterGeocoder.shared` turns addresses into coordinates with a disk cache (Petfinder has no coordinates). `FollowedSheltersStore` (environment) + background check for new arrivals. Reusable: `ShelterMiniMap`, `ContactButtons`, `OpenStatusLabel`, `MapsLink`. `Shelter.openStatus()` reads free-text hours.
 - For now: no server in the middle and no tests.
 
 ## Rules
