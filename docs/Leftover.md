@@ -60,10 +60,27 @@ Each item notes **what we did instead** and **how to add it later**.
 | Visible error when "load more" fails | Silently stops; scrolling to the end again retries | Show a "Couldn't load more · Retry" row at the bottom |
 | Analytics events (`search_performed`, `filter_applied`, `pet_viewed`) | None | Firebase Analytics `logEvent` once Firebase is added |
 
-## Later phases (3 onwards)
+## Phase 3: Pet Detail
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| Video in the carousel | Photos only | Petfinder's `videos` field has embed HTML; show it in a `WKWebView` (Petfinder videos are YouTube embeds) |
+| Universal link for sharing (`pawfinder.app/pet/123`) | `ShareLink` shares the Petfinder listing URL (or a text message for mock pets) | Needs a domain + Associated Domains (Phase 14) |
+| Full description | Petfinder's API only returns a short preview; we show it with "Read more" plus a "View full listing on Petfinder" link | No API fix; this is a Petfinder limitation |
+| Actions: favorite, apply, message shelter | Not on the detail screen yet | Phase 4 (favorite), Phase 9 (apply), Phase 10 (message) |
+| Compatibility score with your lifestyle | Not shown | Phase 12 (needs the lifestyle questionnaire from Phase 7) |
+| Distance from **your** location | Only shows distance when Discover had a typed location | Phase 5 `LocationService` |
+| Shelter profile page (tapping the shelter) | Shelter card with name, address, mini-map, call/email/website; `Route.shelter` is still a placeholder | Phase 5 |
+| Directions inside the app | Tapping the mini-map opens Apple Maps | Fine as is; Phase 5 can use `MKMapItem.openInMaps` for driving directions |
+| Report listing sent to a backend/moderator | Saved on the device only (`UserDefaults` key `listingReports`) and a "thanks" message | Write to a Firestore `reports` collection once Firebase is added |
+| Pan/zoom polish in the full-screen viewer (edge limits, momentum) | Pinch, double-tap to zoom, and drag while zoomed; no limits on how far you can drag | Clamp `offset` to the image bounds |
+| Refreshing the pet's status when the detail opens | Shows the data from the grid/rail (could be stale from Recently viewed) | Call `repository.fetchPet(id:)` on appear and replace the pet |
+| Shelter + geocoding cache | Shelter and its map location are fetched every time a detail opens | Keep a `[shelterID: Shelter]` dictionary in the repository |
+
+## Later phases (4 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
 ---
 
-**Not yet verified:** Phases 0–2 were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–3 were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

@@ -17,6 +17,46 @@ struct PetfinderAnimalResponse: Decodable {
     let animal: PetfinderAnimal
 }
 
+struct PetfinderOrganizationResponse: Decodable {
+    let organization: PetfinderOrganization
+}
+
+struct PetfinderOrganization: Decodable {
+    let id: String
+    let name: String?
+    let email: String?
+    let phone: String?
+    let address: PetfinderAddress?
+    let url: String?       // Petfinder page
+    let website: String?   // shelter's own site (often blank)
+
+    func toShelter() -> Shelter {
+        Shelter(
+            id: id,
+            name: name ?? "Shelter",
+            email: email,
+            phone: phone,
+            address: address?.formatted ?? "",
+            website: website.flatMap(URL.init(string:)).flatMap { $0.scheme == nil ? nil : $0 },
+            petfinderURL: url.flatMap(URL.init(string:))
+        )
+    }
+}
+
+struct PetfinderAddress: Decodable {
+    let address1: String?
+    let city: String?
+    let state: String?
+    let postcode: String?
+
+    /// "7201 Levander Loop, Austin, TX 78702" (skips blank parts)
+    var formatted: String {
+        let cityState = [city, state].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
+        let cityLine = [cityState, postcode ?? ""].filter { !$0.isEmpty }.joined(separator: " ")
+        return [address1 ?? "", cityLine].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+}
+
 struct PetfinderBreedsResponse: Decodable {
     let breeds: [Breed]
 
@@ -69,12 +109,9 @@ struct PetfinderAnimal: Decodable {
     }
 
     struct Contact: Decodable {
-        let address: Address?
-
-        struct Address: Decodable {
-            let city: String?
-            let state: String?
-        }
+        let email: String?
+        let phone: String?
+        let address: PetfinderAddress?
     }
 
     func toPet() -> Pet {
@@ -103,7 +140,10 @@ struct PetfinderAnimal: Decodable {
             specialNeeds: attributes?.specialNeeds ?? false,
             tags: tags ?? [],
             publishedAt: publishedAt.flatMap(Self.dateFormatter.date(from:)),
-            webURL: url
+            webURL: url,
+            primaryBreed: breeds?.primary,
+            contactEmail: contact?.email,
+            contactPhone: contact?.phone
         )
     }
 

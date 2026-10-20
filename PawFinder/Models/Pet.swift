@@ -23,7 +23,12 @@ struct Pet: Identifiable, Hashable, Codable {
     let specialNeeds: Bool
     let tags: [String]
     let publishedAt: Date?
-    let webURL: URL?
+    let webURL: URL?             // the listing on petfinder.com
+
+    // Added in Phase 3. Optional with defaults so older saved data still decodes.
+    var primaryBreed: String? = nil   // "Beagle", used to find similar pets
+    var contactEmail: String? = nil
+    var contactPhone: String? = nil
 
     /// "Young · Male · Medium", for list rows.
     var summary: String {

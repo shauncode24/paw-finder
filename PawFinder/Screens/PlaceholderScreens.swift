@@ -32,45 +32,17 @@ struct TabHomeView: View {
 /// Shows the screen for a Route.
 struct RouteView: View {
     let route: Route
+    @Environment(\.petRepository) private var petRepository
 
     var body: some View {
         switch route {
         case .petDetail(let pet):
-            PetDetailPlaceholder(pet: pet)
+            PetDetailView(pet: pet, repository: petRepository)
         case .shelter(let id):
             EmptyStateView(icon: "house.fill", title: "Shelter", message: "Shelter \(id)")
                 .navigationTitle("Shelter")
         case .designSystem:
             DesignSystemPreviewView()
         }
-    }
-}
-
-/// Temporary detail screen until Phase 3. Records the pet as recently viewed.
-private struct PetDetailPlaceholder: View {
-    let pet: Pet
-    @Environment(RecentlyViewedStore.self) private var recentlyViewed
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                Color.clear
-                    .frame(height: 280)
-                    .overlay { PetPhoto(url: pet.photoURLs.first ?? pet.thumbnailURL, species: pet.species) }
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.large))
-                Text(pet.name).font(.pfTitle)
-                Text(pet.breed).foregroundStyle(Color.pfTextSecondary)
-                Text(pet.summary).foregroundStyle(Color.pfTextSecondary)
-                Text("Full details coming in Phase 3.")
-                    .font(.pfCaption)
-                    .foregroundStyle(Color.pfTextSecondary)
-            }
-            .foregroundStyle(Color.pfTextPrimary)
-            .padding(Spacing.lg)
-        }
-        .background(Color.pfBackground)
-        .navigationTitle(pet.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear { recentlyViewed.add(pet) }
     }
 }

@@ -7,6 +7,7 @@ protocol PetRepository {
     func fetchPet(id: String) async throws -> Pet
     /// All breed names for a species, for search suggestions.
     func fetchBreeds(for species: PetFilters.Species) async throws -> [String]
+    func fetchShelter(id: String) async throws -> Shelter
 }
 
 /// Real data from Petfinder.
@@ -36,6 +37,11 @@ struct RemotePetRepository: PetRepository {
     func fetchBreeds(for species: PetFilters.Species) async throws -> [String] {
         let response: PetfinderBreedsResponse = try await client.get("types/\(species.rawValue.lowercased())/breeds")
         return response.breeds.map(\.name)
+    }
+
+    func fetchShelter(id: String) async throws -> Shelter {
+        let response: PetfinderOrganizationResponse = try await client.get("organizations/\(id)")
+        return response.organization.toShelter()
     }
 }
 
