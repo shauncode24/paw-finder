@@ -149,7 +149,7 @@ struct ShelterProfileView: View {
                         style: isFollowing ? .secondary : .primary) {
             followed.toggle(shelter)
             if followed.isFollowing(shelter.id) {
-                Task { await NotificationManager.shared.requestAuthorizationIfNeeded() }
+                Task { await NotificationManager.shared.askPermission(for: .shelters) }
             }
         }
         .sensoryFeedback(.success, trigger: isFollowing)

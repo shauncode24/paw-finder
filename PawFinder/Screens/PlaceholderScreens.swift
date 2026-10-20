@@ -60,6 +60,10 @@ struct RouteView: View {
             ConversationsListView()
         case .conversation(let id):
             ChatView(conversationID: id)
+        case .savedSearches:
+            SavedSearchesView()
+        case .notificationSettings:
+            NotificationSettingsView()
         case .designSystem:
             DesignSystemPreviewView()
         }

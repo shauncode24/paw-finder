@@ -13,6 +13,7 @@ struct PawFinderApp: App {
     @State private var applications = ApplicationsStore()
     @State private var messages = MessagesStore()
     @State private var network = NetworkMonitor()
+    @State private var savedSearches = SavedSearchesStore()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
@@ -50,6 +51,11 @@ struct PawFinderApp: App {
                 .environment(applications)
                 .environment(messages)
                 .environment(network)
+                .environment(savedSearches)
+                // The number on the app icon: unread messages, adopted favorites, new search matches.
+                .onChange(of: badgeCount, initial: true) { _, count in
+                    NotificationManager.shared.updateBadge(count)
+                }
                 // Send messages that were written offline.
                 .onChange(of: network.isOnline) { _, isOnline in
                     if isOnline { messages.flushOutbox() }
@@ -92,7 +98,14 @@ struct PawFinderApp: App {
         await NotificationManager.shared.notifyStatusChanges(changed)
         let arrivals = await followedShelters.checkNewArrivals(using: petRepository)
         await NotificationManager.shared.notifyNewArrivals(arrivals)
+        let matches = await savedSearches.checkNewMatches(using: petRepository)
+        await NotificationManager.shared.notifySavedSearchMatches(matches)
         applications.refresh()
         messages.refresh()
+        NotificationManager.shared.updateBadge(badgeCount)
+    }
+
+    private var badgeCount: Int {
+        messages.unreadCount + favorites.favorites.filter(\.statusChanged).count + savedSearches.newMatchTotal
     }
 }

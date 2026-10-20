@@ -41,10 +41,13 @@ struct SettingsView: View {
                     Spacer()
                     Text(notificationText).foregroundStyle(Color.pfTextSecondary)
                 }
+                NavigationLink(value: Route.notificationSettings) {
+                    Text("Notification preferences & quiet hours")
+                }
                 if notificationStatus == .notDetermined {
                     Button("Turn on notifications") {
                         Task {
-                            await NotificationManager.shared.requestAuthorizationIfNeeded()
+                            await NotificationManager.shared.requestSystemPermission()
                             await refreshNotificationStatus()
                         }
                     }

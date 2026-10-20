@@ -38,6 +38,8 @@ enum Route: Hashable {
     case applicationDetail(UUID)
     case messages
     case conversation(UUID)
+    case savedSearches
+    case notificationSettings
     case settings
     case designSystem
 }
@@ -47,6 +49,8 @@ enum Route: Hashable {
 final class Router {
     var selectedTab: AppTab = .discover
     var paths: [AppTab: [Route]] = [:]
+    /// A saved search for Discover to run (set by links and the saved searches list).
+    var pendingSavedSearchID: UUID?
 
     func push(_ route: Route) {
         paths[selectedTab, default: []].append(route)
@@ -76,6 +80,7 @@ final class Router {
     ///     pawfinder://shelter/NJ333  a shelter profile
     ///     pawfinder://application/<uuid>  an adoption application
     ///     pawfinder://conversation/<uuid> a chat with a shelter
+    ///     pawfinder://search/<uuid>  run a saved search in Discover
     ///     pawfinder://favorites      a tab (discover, map, identify, favorites, profile)
     ///     pawfinder://settings       the Settings screen
     ///
@@ -98,6 +103,11 @@ final class Router {
         case "conversation":
             guard let argument, let id = UUID(uuidString: argument) else { return false }
             open(.conversation(id), in: .profile)
+        case "search":
+            guard let argument, let id = UUID(uuidString: argument) else { return false }
+            selectedTab = .discover
+            paths[.discover] = []
+            pendingSavedSearchID = id
         case "settings":
             open(.settings, in: .profile)
         default:

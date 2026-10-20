@@ -141,7 +141,19 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Real read receipts | Simulated: "Delivered" after 1s, "Read" after 3s | Comes with real chat |
 | Sending messages with several photos or files | One photo per message (from the library) | `PhotosPicker` with `maxSelectionCount` |
 
-## Later phases (11 onwards)
+## Phase 11: Notifications & Saved Search Alerts
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| APNs registration and device token management *(server)* | No remote push. Everything is a **local** notification, from the background check or scheduled ahead of time | Needs a paid Apple Developer account (Push capability), `registerForRemoteNotifications`, and a server or FCM to send pushes |
+| Server fan-out for saved searches, favorite status changes, and followed shelters *(server)* | The background check (`BackgroundRefresh`) looks for new matches, adoptions, and new arrivals on the phone and notifies | A scheduled Cloud Function (`matchSavedSearches`) |
+| Alerts arriving at a predictable time | Background checks run when iOS decides (often every few hours, less if the app is rarely used) | Only real push fixes this |
+| Saved-search alerts in sample-data mode | Sample pets never change, so saved searches don't find new matches without Petfinder keys | Use real keys to see alerts |
+| Notification actions (e.g. "Reply" or "View pet" buttons on the notification) | Tapping opens the right screen | `UNNotificationCategory` with actions |
+| Rich previews with pet photos | Text only | Notification Service Extension (Phase 14 with the other extensions) or attach the saved favorite photo with `UNNotificationAttachment` |
+| Badge synced with a server *(server)* | The app icon badge is worked out on the phone: unread messages + favorites with a status change + new saved-search matches | Fine as is |
+
+## Later phases (12 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
@@ -178,4 +190,4 @@ These were on this list and are now in the app:
 
 ---
 
-**Not yet verified:** Phases 0–5, 7, 9, 10, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–5, 7, 9–11, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

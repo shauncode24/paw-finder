@@ -114,7 +114,17 @@ final class ApplicationsStore {
         applications[index].scheduledEvents = Self.simulatedReplies(for: applications[index], submittedAt: now)
         save()
         let application = applications[index]
-        Task { await NotificationManager.shared.scheduleApplicationUpdates(application) }
+        Task {
+            await NotificationManager.shared.askPermission(for: .applications)
+            await NotificationManager.shared.scheduleApplicationUpdates(application)
+        }
+    }
+
+    /// After the user turns notifications on, schedule the ones we couldn't before.
+    func rescheduleNotifications() async {
+        for application in applications where application.isActive && !application.scheduledEvents.isEmpty {
+            await NotificationManager.shared.scheduleApplicationUpdates(application)
+        }
     }
 
     func withdraw(_ id: UUID) {

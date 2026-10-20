@@ -152,7 +152,10 @@ final class MessagesStore {
         conversations[index].pendingReplies.append(reply)
 
         let conversation = conversations[index]
-        Task { await NotificationManager.shared.scheduleMessageReply(reply, in: conversation) }
+        Task {
+            await NotificationManager.shared.askPermission(for: .messages)
+            await NotificationManager.shared.scheduleMessageReply(reply, in: conversation)
+        }
     }
 
     private static func replyText(to message: Message, in conversation: Conversation) -> String {

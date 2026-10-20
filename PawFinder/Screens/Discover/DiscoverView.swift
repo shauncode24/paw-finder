@@ -6,6 +6,10 @@ struct DiscoverView: View {
     @State private var showFilters = false
     @AppStorage("discoverShowsList") private var showsList = false
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
+    @Environment(SavedSearchesStore.self) private var savedSearches
+    @Environment(Router.self) private var router
+    @State private var showSaveSearch = false
+    @State private var saveSearchName = ""
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: Spacing.md)]
 
@@ -49,6 +53,7 @@ struct DiscoverView: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) { savedSearchMenu }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     withAnimation { showsList.toggle() }
@@ -76,6 +81,54 @@ struct DiscoverView: View {
         .task(id: viewModel.filters) { await viewModel.filtersChanged() }
         .task(id: viewModel.filters.species) { await viewModel.loadBreeds() }
         .task(id: viewModel.filters.location) { await viewModel.loadRailsIfNeeded() }
+        // Run a saved search picked from the list or a notification.
+        .onChange(of: router.pendingSavedSearchID, initial: true) { _, id in
+            guard let id else { return }
+            if let search = savedSearches.search(id) {
+                viewModel.filters = search.filters
+                savedSearches.markSeen(id)
+            }
+            router.pendingSavedSearchID = nil
+        }
+        .alert("Save this search", isPresented: $showSaveSearch) {
+            TextField("Name", text: $saveSearchName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                savedSearches.add(name: saveSearchName, filters: viewModel.filters, alertsOn: true)
+                Task { await NotificationManager.shared.askPermission(for: .savedSearches) }
+            }
+        } message: {
+            Text("We'll let you know when new pets match.")
+        }
+    }
+
+    // MARK: - Saved searches
+
+    private var savedSearchMenu: some View {
+        let current = savedSearches.search(matching: viewModel.filters)
+        return Menu {
+            if let current {
+                Button("Remove from saved", systemImage: "bookmark.slash") { savedSearches.delete(current.id) }
+            } else {
+                Button("Save this search", systemImage: "bookmark") {
+                    saveSearchName = SavedSearch.suggestedName(for: viewModel.filters)
+                    showSaveSearch = true
+                }
+                .disabled(viewModel.filters.isDefault)
+            }
+            NavigationLink(value: Route.savedSearches) {
+                Label("Saved searches (\(savedSearches.searches.count))", systemImage: "list.bullet")
+            }
+        } label: {
+            Image(systemName: current == nil ? "bookmark" : "bookmark.fill")
+                .overlay(alignment: .topTrailing) {
+                    if savedSearches.newMatchTotal > 0 {
+                        Circle().fill(Color.pfBrandPrimary).frame(width: 8, height: 8).offset(x: 4, y: -2)
+                    }
+                }
+        }
+        .accessibilityLabel("Saved searches")
+        .accessibilityValue(savedSearches.newMatchTotal > 0 ? "\(savedSearches.newMatchTotal) new matches" : "")
     }
 
     // MARK: - Sections
@@ -244,4 +297,6 @@ struct DiscoverView: View {
     .environment(ProfileStore())
     .environment(ApplicationsStore())
     .environment(MessagesStore())
+    .environment(SavedSearchesStore())
+    .environment(Router())
 }

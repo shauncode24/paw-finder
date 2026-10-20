@@ -22,6 +22,16 @@ struct RootView: View {
                 .badge(tab == .profile ? messages.unreadCount : 0)
             }
         }
+        // Our "turn on notifications?" explanation, before the system prompt.
+        .sheet(isPresented: Binding(
+            get: { NotificationManager.shared.primingCategory != nil },
+            set: { isShown in if !isShown, NotificationManager.shared.primingCategory != nil { NotificationManager.shared.declinePriming() } }
+        )) {
+            if let category = NotificationManager.shared.primingCategory {
+                NotificationPrimingView(category: category)
+                    .presentationDetents([.large])
+            }
+        }
     }
 }
 
@@ -37,4 +47,5 @@ struct RootView: View {
         .environment(ApplicationsStore())
         .environment(MessagesStore())
         .environment(NetworkMonitor())
+        .environment(SavedSearchesStore())
 }
