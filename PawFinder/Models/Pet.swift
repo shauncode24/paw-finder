@@ -52,6 +52,8 @@ struct PetPage {
     let totalPages: Int
     /// Set when these pets came from the offline cache instead of the network.
     var cachedAt: Date? = nil
+    /// True when these are the built-in sample pets, not Petfinder's.
+    var isSample = false
 
     var hasMore: Bool { currentPage < totalPages }
 }

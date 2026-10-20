@@ -14,6 +14,7 @@ struct PawFinderApp: App {
     @State private var messages = MessagesStore()
     @State private var network = NetworkMonitor()
     @State private var savedSearches = SavedSearchesStore()
+    @State private var careChecklists = CareChecklistStore()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
@@ -30,8 +31,9 @@ struct PawFinderApp: App {
 
         let router = Router()
         _router = State(initialValue: router)
-        // Tapping a notification opens its deep link.
+        // Notification taps and Siri/Shortcuts open deep links through the router.
         NotificationManager.shared.onOpenURL = { url in router.handle(url) }
+        AppLinks.handler = { url in router.handle(url) }
     }
 
     var body: some Scene {
@@ -52,6 +54,7 @@ struct PawFinderApp: App {
                 .environment(messages)
                 .environment(network)
                 .environment(savedSearches)
+                .environment(careChecklists)
                 // The number on the app icon: unread messages, adopted favorites, new search matches.
                 .onChange(of: badgeCount, initial: true) { _, count in
                     NotificationManager.shared.updateBadge(count)
@@ -68,6 +71,12 @@ struct PawFinderApp: App {
                 .tint(.pfBrandPrimary)
                 .preferredColorScheme(appearance.colorScheme)
                 .onOpenURL { url in router.handle(url) }
+                // Handoff from another device.
+                .onContinueUserActivity("com.pawfinder.viewPet") { activity in
+                    if let id = activity.userInfo?["petID"] as? String {
+                        router.open(.petID(id), in: .discover)
+                    }
+                }
                 // Tapping a favorite in iPhone search (Spotlight).
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String {

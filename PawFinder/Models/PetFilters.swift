@@ -1,7 +1,7 @@
 import Foundation
 
 /// Everything the user can search and filter by on Discover.
-struct PetFilters: Codable, Equatable {
+struct PetFilters: Codable, Hashable {
     var name = ""                    // search box text
     var species: Species?
     var breed: String?

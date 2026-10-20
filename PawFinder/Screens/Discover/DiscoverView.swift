@@ -24,6 +24,8 @@ struct DiscoverView: View {
             VStack(alignment: .leading, spacing: Spacing.xl) {
                 if let cachedAt = viewModel.cachedAt {
                     offlineBanner(cachedAt)
+                } else if viewModel.isShowingSamples {
+                    sampleBanner
                 }
 
                 activeFilterChips
@@ -54,6 +56,12 @@ struct DiscoverView: View {
         }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { savedSearchMenu }
+            ToolbarItem(placement: .topBarLeading) {
+                NavigationLink(value: Route.swipe(viewModel.filters)) {
+                    Image(systemName: "rectangle.stack")
+                }
+                .accessibilityLabel("Swipe mode")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     withAnimation { showsList.toggle() }
@@ -82,6 +90,12 @@ struct DiscoverView: View {
         .task(id: viewModel.filters.species) { await viewModel.loadBreeds() }
         .task(id: viewModel.filters.location) { await viewModel.loadRailsIfNeeded() }
         // Run a saved search picked from the list or a notification.
+        // Filters from Siri, breed guides, or links.
+        .onChange(of: router.pendingFilters, initial: true) { _, filters in
+            guard let filters else { return }
+            viewModel.filters = filters
+            router.pendingFilters = nil
+        }
         .onChange(of: router.pendingSavedSearchID, initial: true) { _, id in
             guard let id else { return }
             if let search = savedSearches.search(id) {
@@ -195,6 +209,18 @@ struct DiscoverView: View {
                 Task { await viewModel.loadMore() }
             }
         }
+    }
+
+    private var sampleBanner: some View {
+        Label(Secrets.hasPetfinderKeys
+              ? "Petfinder isn't reachable right now, so you're seeing sample pets."
+              : "You're seeing sample pets. Add Petfinder keys to see real adoptable pets.",
+              systemImage: "sparkles")
+            .font(.subheadline)
+            .foregroundStyle(Color.pfTextPrimary)
+            .padding(Spacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.pfBrandDeep, in: RoundedRectangle(cornerRadius: Radius.medium))
     }
 
     private func offlineBanner(_ date: Date) -> some View {

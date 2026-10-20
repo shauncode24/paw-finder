@@ -5,7 +5,7 @@ Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list 
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
 ## Current phase
-Phase 11 done; Phases 6 (Core ML) and 8 (cloud sync) skipped for now (update this line as phases complete)
+Phases 0–5, 7, 9–11, 13 done; 14 partly (App Intents, Handoff; no extensions); 6, 8, 12 skipped for now (update this line as phases complete)
 
 ## Setup
 - One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, `Models/`, `Services/`.
@@ -31,6 +31,9 @@ Phase 11 done; Phases 6 (Core ML) and 8 (cloud sync) skipped for now (update thi
 - Messages (`Screens/Messages/`): `MessagesStore` (environment) saves `Conversation`s to `Documents/messages.json` (photos in `Documents/MessageFiles/`). A **simulated shelter** plans a keyword-based reply on send (`pendingReplies`), applied by `refresh()`; local notification via `NotificationManager.scheduleMessageReply` (suppressed for the open chat via `openConversationID`). `NetworkMonitor` (environment) drives the offline outbox (`flushOutbox()`). `ContentModerator` checks outgoing text. Unread count badges the Profile tab. Routes `.messages`, `.conversation(id)`; deep link `pawfinder://conversation/<uuid>`.
 - Notifications: everything is local. `NotificationManager.shared` (`@Observable`) schedules all of them through `deliver(...)`, which checks `NotificationPreferences` (per-category switches + quiet hours, in UserDefaults; edited in `NotificationSettingsView`). Never call the system permission prompt directly: call `askPermission(for:)`, which shows `NotificationPrimingView` first (presented by `RootView`). The app icon badge = unread messages + changed favorites + new saved-search matches.
 - Saved searches: `SavedSearchesStore` (environment) + `SavedSearchesView`; the Discover bookmark menu saves/opens them. Run one by setting `router.pendingSavedSearchID` (Discover applies it); deep link `pawfinder://search/<uuid>`. The background task checks favorites, followed shelters, and saved searches.
+- Data fallback: with keys, `PetRepositoryFactory` returns `FallbackPetRepository` (Petfinder first, sample data if it fails). Sample IDs start with `mock-` / `shelter-`. `PetPage.isSample` drives the "sample pets" banner in Discover.
+- Phase 13: `Screens/Swipe/` (SwipeView/SwipeViewModel, `Route.swipe(filters)`), `Screens/Favorites/CompareView.swift` (`Route.compare(pets)`), `Screens/CareHub/` + `Models/CareContent.swift` (built-in content; `CareChecklistStore` in the environment). `router.showInDiscover(filters)` runs a search in Discover.
+- Phase 14: `App/AppIntents.swift` (Siri/Shortcuts; intents open deep links via `AppLinks.handler`), Handoff activity `com.pawfinder.viewPet` (declared in Info.plist). No extension targets yet (widgets, Live Activities, share, notification service).
 - For now and later phases: **no server, no cloud, no tests.** Firebase Auth (already in) is the only cloud piece. Anything cloud-related goes to docs/Leftover.md marked *(cloud)*.
 
 ## Rules

@@ -38,6 +38,7 @@ struct ShelterPage {
     let shelters: [Shelter]
     let currentPage: Int
     let totalPages: Int
+    var isSample = false
 
     var hasMore: Bool { currentPage < totalPages }
 }

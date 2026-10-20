@@ -79,6 +79,13 @@ struct PetDetailView: View {
             ReportListingSheet(pet: pet)
         }
         .task { await viewModel.load() }
+        // Handoff: pick up this pet on another device (or in Safari via its Petfinder link).
+        .userActivity("com.pawfinder.viewPet") { activity in
+            activity.title = "\(pet.name) on PawFinder"
+            activity.userInfo = ["petID": pet.id]
+            activity.webpageURL = pet.webURL
+            activity.isEligibleForHandoff = true
+        }
         // Keep the saved favorite up to date with the fresh copy.
         .onChange(of: viewModel.pet) { _, fresh in
             favorites.updateSnapshot(fresh)

@@ -153,7 +153,64 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Rich previews with pet photos | Text only | Notification Service Extension (Phase 14 with the other extensions) or attach the saved favorite photo with `UNNotificationAttachment` |
 | Badge synced with a server *(server)* | The app icon badge is worked out on the phone: unread messages + favorites with a status change + new saved-search matches | Fine as is |
 
-## Later phases (12 onwards)
+## Phase 12: Personalization & On-Device Intelligence
+
+**Not started** (not part of the Phase 13–14 checkpoint). Compatibility scoring, the For You feed, natural-language search, and AI summaries are all still to do. The lifestyle questionnaire (Phase 7) is ready to feed compatibility scoring.
+
+## Phase 13: Swipe, Compare & Care Hub
+
+**Done:**
+
+| SPEC item | What we built |
+|---|---|
+| Swipe card stack with gestures | `SwipeView` (Discover › stack icon): drag right = like (favorite), left = pass, up = super-like (favorite + "Top picks" collection). Uses Discover's current filters. Buttons do the same, for VoiceOver users |
+| Haptics | Different feedback for like, pass, and super-like |
+| Undo | Brings the last card back and reverses its effect |
+| Prefetching | Loads the next page when fewer than 5 cards are left; the 2 cards under the top one are already rendered, so their photos load early |
+| Compare view (2–3 pets, highlighted differences) | Favorites › Compare: pick 2–3, see 13 attributes side by side; differing rows are highlighted, with an "Only show differences" switch |
+| Care Hub: articles, breed guides, persisted checklists | Profile › Care Hub: 6 guides (Markdown), 8 breed guides with "Find adoptable [breed]" (opens Discover filtered), 2 checklists whose ticks are saved |
+
+**Not done:**
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| Care Hub articles from remote config, with caching *(cloud)* | Articles are built into the app (`CareContent.swift`), so they work offline but need an app update to change | Firebase Remote Config or a JSON file on a server |
+| Passed pets synced across devices *(cloud)* | Passed pets are remembered on this phone (last 1,000) | Phase 8 |
+| Swiping powering recommendations | Swipes only favorite/pass for now | Phase 12: likes and passes as signals |
+| Comparing from places other than Favorites | Compare starts from Favorites | Add a "Compare" action to pet detail |
+
+## Phase 14: Platform Integrations
+
+**Done:**
+
+| SPEC item | What we built |
+|---|---|
+| App Intents + Shortcuts | `AppIntents.swift`: "Find adoptable pets" (optional animal type: "Show dogs in PawFinder"), "Open my favorite pets", "Show shelters near me", "Open my messages". They appear in the Shortcuts app and work with Siri without setup |
+| Handoff | The pet detail screen advertises a `com.pawfinder.viewPet` activity; another device signed in to the same Apple ID can continue it (and a Mac can open the Petfinder page in Safari) |
+| Spotlight | Already done in the scope bump (favorites are searchable) |
+| Deep links | Already done; Siri intents also use them (`pawfinder://discover?species=dog`, `pawfinder://messages`) |
+
+**Not done** (all need an **extension target**, a second app target that Xcode normally creates; adding one by hand to the project file without Xcode is too risky):
+
+| Left out | Why | How to add it later |
+|---|---|---|
+| WidgetKit widgets (favorite pet, pet of the day, application status) | Needs a Widget Extension target and an App Group (App Groups need a paid account) to share data | File › New › Target › Widget Extension; move the favorites/applications JSON into the App Group container |
+| Live Activity for application status | Lives in the same Widget Extension | Add an `ActivityConfiguration` in the widget extension; start it from `ApplicationsStore.submit` |
+| Share extension ("Save to PawFinder") | Needs a Share Extension target + App Group | File › New › Target › Share Extension |
+| Notification Service Extension (rich previews, from Phases 10–11) | Needs its own target | File › New › Target › Notification Service Extension |
+| "Identify this pet" intent | Phase 6 (Core ML) was skipped | Add once breed identification exists |
+| Universal links (`https://pawfinder.app/pet/123`) | Needs a domain you own + Associated Domains (paid account) | Host `apple-app-site-association`, add the entitlement |
+| iPad split-view layout (`NavigationSplitView`) | Optional in SPEC; the tab layout already works on iPad | A `NavigationSplitView` for regular width |
+
+## Sample data (works until the APIs are online)
+
+The app always has something to show:
+- **No Petfinder keys:** everything runs on the built-in sample data (`MockPetRepository`): 25 pets (with placeholder photos from placedog.net / cataas.com, falling back to a paw icon), 8 shelters with hours and addresses, breed lists, and Discover shows a "You're seeing sample pets" banner.
+- **Keys present, but Petfinder down / offline with nothing cached / bad keys:** `FallbackPetRepository` quietly switches to the same sample data, with a "Petfinder isn't reachable" banner, instead of an error screen.
+- **Simulated shelter:** applications (Phase 9) and messages (Phase 10) always use the simulated shelter, so they work without any backend.
+- **Built in:** Care Hub content, breed guides, and checklists.
+
+## Later phases (15 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
@@ -190,4 +247,4 @@ These were on this list and are now in the app:
 
 ---
 
-**Not yet verified:** Phases 0–5, 7, 9–11, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–5, 7, 9–11, 13–14 (partly), and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

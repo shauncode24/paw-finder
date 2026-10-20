@@ -1,7 +1,10 @@
 import Foundation
 
-/// Fake pets for previews, and for running the app without API keys.
+/// Sample pets and shelters: used for previews, when there are no API keys,
+/// and as the fallback when Petfinder can't be reached (FallbackPetRepository).
 /// Applies filters roughly the way Petfinder does, so the UI can be tested.
+/// Photos come from free placeholder-photo sites; if those are down, the
+/// app shows its paw placeholder instead.
 struct MockPetRepository: PetRepository {
     var pageSize = 10
     /// Fake network delay so loading states are visible.
@@ -22,7 +25,7 @@ struct MockPetRepository: PetRepository {
 
         let totalPages = max(1, Int((Double(matching.count) / Double(pageSize)).rounded(.up)))
         let pagePets = Array(matching.dropFirst((page - 1) * pageSize).prefix(pageSize))
-        return PetPage(pets: pagePets, currentPage: page, totalPages: totalPages)
+        return PetPage(pets: pagePets, currentPage: page, totalPages: totalPages, isSample: true)
     }
 
     func fetchPet(id: String) async throws -> Pet {
@@ -45,7 +48,7 @@ struct MockPetRepository: PetRepository {
 
     func fetchShelters(near location: String, distance: Int, page: Int) async throws -> ShelterPage {
         try await Task.sleep(for: delay)
-        return ShelterPage(shelters: page == 1 ? Self.sampleShelters : [], currentPage: page, totalPages: 1)
+        return ShelterPage(shelters: page == 1 ? Self.sampleShelters : [], currentPage: page, totalPages: 1, isSample: true)
     }
 
     func fetchBreeds(for species: PetFilters.Species) async throws -> [String] {
@@ -111,6 +114,15 @@ struct MockPetRepository: PetRepository {
         ]
     }()
 
+    /// Two placeholder photos per sample pet (placedog.net / cataas.com).
+    private static func samplePhotos(isDog: Bool, number: Int) -> [URL] {
+        let links = isDog
+            ? ["https://placedog.net/640/480?id=\(number)", "https://placedog.net/640/480?id=\(number + 40)"]
+            : ["https://cataas.com/cat?width=640&height=480&pet=\(number)",
+               "https://cataas.com/cat?width=640&height=480&pet=\(number + 40)"]
+        return links.compactMap(URL.init(string:))
+    }
+
     static let samplePets: [Pet] = {
         let names = ["Biscuit", "Luna", "Milo", "Bella", "Charlie", "Nala", "Oliver", "Daisy", "Max", "Coco",
                      "Leo", "Ruby", "Simba", "Rosie", "Buddy", "Cleo", "Teddy", "Willow", "Rocky", "Pepper",
@@ -133,8 +145,8 @@ struct MockPetRepository: PetRepository {
                 description: "\(name) is a friendly \(isDog ? "pup" : "cat") looking for a loving home. "
                     + "\(name) loves walks, treats, and naps in the sun, and gets along well with most people. "
                     + "Ask the shelter about a meet-and-greet to see if \(name) is the right fit for your family.",
-                photoURLs: [],
-                thumbnailURL: nil,
+                photoURLs: samplePhotos(isDog: isDog, number: index + 1),
+                thumbnailURL: samplePhotos(isDog: isDog, number: index + 1).first,
                 location: shelter.cityState,
                 distance: nil,
                 shelterID: shelter.id,

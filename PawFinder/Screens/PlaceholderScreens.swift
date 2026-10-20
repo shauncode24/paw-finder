@@ -64,6 +64,24 @@ struct RouteView: View {
             SavedSearchesView()
         case .notificationSettings:
             NotificationSettingsView()
+        case .swipe(let filters):
+            SwipeView(repository: petRepository, filters: filters)
+        case .compare(let pets):
+            CompareView(pets: pets)
+        case .careHub:
+            CareHubView()
+        case .careArticle(let id):
+            if let article = CareContent.articles.first(where: { $0.id == id }) {
+                CareArticleView(article: article)
+            }
+        case .breedGuide(let name):
+            if let guide = CareContent.breedGuides.first(where: { $0.name == name }) {
+                BreedGuideView(guide: guide)
+            }
+        case .careChecklist(let id):
+            if let checklist = CareContent.checklists.first(where: { $0.id == id }) {
+                CareChecklistView(checklist: checklist)
+            }
         case .designSystem:
             DesignSystemPreviewView()
         }

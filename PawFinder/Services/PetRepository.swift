@@ -82,7 +82,8 @@ enum PetRepositoryFactory {
             return MockPetRepository()
         }
         let client = PetfinderClient(apiKey: Secrets.petfinderAPIKey, apiSecret: Secrets.petfinderAPISecret)
-        return RemotePetRepository(client: client)
+        // Real data, with sample pets as a safety net if Petfinder is unreachable.
+        return FallbackPetRepository(primary: RemotePetRepository(client: client))
     }
 }
 

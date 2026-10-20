@@ -69,6 +69,9 @@ struct ProfileView: View {
                         }
                     }
                 }
+                NavigationLink(value: Route.careHub) {
+                    Label("Care Hub", systemImage: "book")
+                }
                 NavigationLink(value: Route.editProfile) {
                     Label("Edit profile", systemImage: "person.crop.circle")
                 }

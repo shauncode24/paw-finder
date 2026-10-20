@@ -40,6 +40,12 @@ enum Route: Hashable {
     case conversation(UUID)
     case savedSearches
     case notificationSettings
+    case swipe(PetFilters)
+    case compare([Pet])
+    case careHub
+    case careArticle(String)
+    case breedGuide(String)
+    case careChecklist(String)
     case settings
     case designSystem
 }
@@ -51,6 +57,8 @@ final class Router {
     var paths: [AppTab: [Route]] = [:]
     /// A saved search for Discover to run (set by links and the saved searches list).
     var pendingSavedSearchID: UUID?
+    /// Filters for Discover to apply (from Siri, breed guides, links).
+    var pendingFilters: PetFilters?
 
     func push(_ route: Route) {
         paths[selectedTab, default: []].append(route)
@@ -58,6 +66,13 @@ final class Router {
 
     func popToRoot() {
         paths[selectedTab] = []
+    }
+
+    /// Switches to Discover and runs a search.
+    func showInDiscover(_ filters: PetFilters) {
+        selectedTab = .discover
+        paths[.discover] = []
+        pendingFilters = filters
     }
 
     /// Swaps the top screen for another (e.g. the form for the tracker after submitting).
@@ -81,6 +96,8 @@ final class Router {
     ///     pawfinder://application/<uuid>  an adoption application
     ///     pawfinder://conversation/<uuid> a chat with a shelter
     ///     pawfinder://search/<uuid>  run a saved search in Discover
+    ///     pawfinder://discover?species=dog&q=luna   Discover with filters
+    ///     pawfinder://messages       the chats list
     ///     pawfinder://favorites      a tab (discover, map, identify, favorites, profile)
     ///     pawfinder://settings       the Settings screen
     ///
@@ -108,6 +125,20 @@ final class Router {
             selectedTab = .discover
             paths[.discover] = []
             pendingSavedSearchID = id
+        case "messages":
+            open(.messages, in: .profile)
+        case "discover":
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+            if value("species") != nil || value("q") != nil {
+                var filters = PetFilters()
+                filters.species = value("species").flatMap { PetFilters.Species(rawValue: $0.capitalized) }
+                filters.name = value("q") ?? ""
+                showInDiscover(filters)
+            } else {
+                selectedTab = .discover
+                paths[.discover] = []
+            }
         case "settings":
             open(.settings, in: .profile)
         default:

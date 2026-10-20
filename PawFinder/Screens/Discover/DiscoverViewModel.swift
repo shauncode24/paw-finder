@@ -23,6 +23,8 @@ final class DiscoverViewModel {
     private(set) var hasMore = false
     /// Set when offline and showing saved results instead of fresh ones.
     private(set) var cachedAt: Date?
+    /// True when showing the built-in sample pets (no keys, or Petfinder unreachable).
+    private(set) var isShowingSamples = false
 
     // Curated rails, shown when no search or filters are active.
     private(set) var newestPets: [Pet] = []
@@ -74,6 +76,7 @@ final class DiscoverViewModel {
             currentPage = page.currentPage
             hasMore = page.hasMore
             cachedAt = page.cachedAt
+            isShowingSamples = page.isSample
             loadMoreFailed = false
             loadedFilters = requested
             state = pets.isEmpty ? .empty : .loaded

@@ -24,6 +24,11 @@
 	<array>
 		<string>fetch</string>
 	</array>
+	<!-- Handoff: continue looking at a pet on another device -->
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.pawfinder.viewPet</string>
+	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>pawfinder.refreshFavorites</string>

@@ -11,6 +11,8 @@ struct FavoritesView: View {
     @State private var newCollectionName = ""
     @State private var renamingCollection: PetCollection?
     @State private var renameText = ""
+    @State private var showComparePicker = false
+    @Environment(Router.self) private var router
 
     private var items: [FavoritePet] { store.favorites(in: selectedCollection) }
 
@@ -24,8 +26,18 @@ struct FavoritesView: View {
             if !items.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) { EditButton() }
             }
+            if store.favorites.count >= 2 {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Compare") { showComparePicker = true }
+                }
+            }
         }
         .task { await store.refreshStatuses(using: repository) }
+        .sheet(isPresented: $showComparePicker) {
+            ComparePickerSheet(favorites: items.count >= 2 ? items : store.favorites) { pets in
+                router.push(.compare(pets))
+            }
+        }
         .alert("New collection", isPresented: $showNewCollection) {
             TextField("Name", text: $newCollectionName)
             Button("Cancel", role: .cancel) { newCollectionName = "" }
@@ -192,4 +204,5 @@ private struct FavoriteRow: View {
             .navigationTitle("Favorites")
     }
     .environment(FavoritesStore(fileName: "preview-favorites.json"))
+    .environment(Router())
 }
