@@ -29,4 +29,6 @@ struct RootView: View {
         .environment(FavoritesStore(fileName: "preview-favorites.json"))
         .environment(LocationService())
         .environment(FollowedSheltersStore())
+        .environment(AuthManager())
+        .environment(ProfileStore())
 }

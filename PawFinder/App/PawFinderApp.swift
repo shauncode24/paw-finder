@@ -8,7 +8,10 @@ struct PawFinderApp: App {
     @State private var favorites = FavoritesStore()
     @State private var locationService = LocationService()
     @State private var followedShelters = FollowedSheltersStore()
+    @State private var auth: AuthManager
+    @State private var profileStore = ProfileStore()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
     private let petRepository = PetRepositoryFactory.make()
 
@@ -16,6 +19,10 @@ struct PawFinderApp: App {
         // Bigger shared cache so pet photos (loaded by AsyncImage) are kept
         // in memory and on disk instead of re-downloaded while scrolling.
         URLCache.shared = URLCache(memoryCapacity: 50_000_000, diskCapacity: 200_000_000)
+
+        // Accounts: only turns on if GoogleService-Info.plist is in the app.
+        AuthManager.configureFirebase()
+        _auth = State(initialValue: AuthManager())
 
         let router = Router()
         _router = State(initialValue: router)
@@ -26,7 +33,17 @@ struct PawFinderApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                // First launch: welcome → account → lifestyle → location.
+                .fullScreenCover(isPresented: Binding(get: { !hasCompletedOnboarding }, set: { _ in })) {
+                    OnboardingView { hasCompletedOnboarding = true }
+                }
+                // Load the right profile when someone signs in or out.
+                .onChange(of: auth.user?.id, initial: true) { _, userID in
+                    profileStore.switchUser(to: userID, suggestedName: auth.user?.displayName)
+                }
                 .environment(router)
+                .environment(auth)
+                .environment(profileStore)
                 .environment(recentlyViewed)
                 .environment(favorites)
                 .environment(locationService)

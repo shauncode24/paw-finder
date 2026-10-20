@@ -17,18 +17,7 @@ struct TabHomeView: View {
             case .favorites:
                 FavoritesView()
             case .profile:
-                List {
-                    NavigationLink(value: Route.followedShelters) {
-                        Label("Followed shelters", systemImage: "star")
-                    }
-                    NavigationLink(value: Route.settings) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    NavigationLink(value: Route.designSystem) {
-                        Label("Design system", systemImage: "paintpalette")
-                    }
-                }
-                .scrollContentBackground(.hidden)
+                ProfileView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,6 +43,13 @@ struct RouteView: View {
             ShelterProfileView(shelterID: id, repository: petRepository)
         case .followedShelters:
             FollowedSheltersView()
+        case .editProfile:
+            EditProfileView()
+        case .lifestyle:
+            LifestyleQuestionnaireView(popsOnSave: true)
+                .navigationTitle("Your lifestyle")
+        case .account:
+            AccountView()
         case .designSystem:
             DesignSystemPreviewView()
         }

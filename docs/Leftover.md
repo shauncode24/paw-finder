@@ -90,7 +90,28 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Offline shelter search | Shelter results aren't cached (shelter profiles and coordinates are) | Save the last results like `PetCache` |
 | Mock data respects the searched location | Sample data always returns all 8 shelters; the map zooms out to fit them | Fine for testing |
 
-## Later phases (6 onwards)
+## Phase 6: Core ML Breed Identification
+
+**Skipped for now** (at your request). The Identify tab still shows a "Coming in Phase 6" placeholder. Everything in SPEC §8 Phase 6 is still to do: dataset, Create ML training, `BreedClassifier`, photo/camera/live modes, mixed-breed results, history, and "Find adoptable [breed]".
+
+## Phase 7: Auth & Accounts
+
+| Left out | What we did instead | How to add it later |
+|---|---|---|
+| Google sign-in | Email or username + password, and Sign in with Apple | Add the `GoogleSignIn` package and enable Google in Firebase. App Store rules then require Sign in with Apple too (already there) |
+| Sign in with Apple turned on | Code and button are in place; the capability is off because there's no paid Apple Developer account yet | docs/SETUP.md §4: one capability checkbox + enable Apple in Firebase |
+| Our own Keychain token storage and silent refresh | Firebase Auth already keeps the session in the Keychain and refreshes tokens | Nothing to do |
+| Guest data merging into the account across devices | On first sign-in on a phone, the guest's profile and photo move to the account. Favorites, collections, and followed shelters stay on the phone (not tied to an account) | Phase 8 (sync) |
+| Avatar upload to the cloud (Firebase Storage) | Avatar saved on the device only (resized to 512px) | Phase 8: upload to Storage and save the URL in the user's Firestore document |
+| Profile and lifestyle answers in the cloud | Saved on the device, one per account (`ProfileStore`) | Phase 8 |
+| Server-side account deletion pipeline *(server)* | Deletes the Firebase account (with re-sign-in; Apple accounts also revoke the Apple token) and the profile on the device. There's no cloud data to delete yet | A `deleteUserData` Cloud Function once there's Firestore data |
+| Data export request handled by a server *(server)* | "Export my data" makes a JSON file on the phone and shares it | Fine for now |
+| Password reset for username accounts | Not possible (no real email). The sign-up screen says so | Ask for a recovery email, or require email accounts |
+| Email verification | Not required | `user.sendEmailVerification()` after sign-up, and check `isEmailVerified` |
+| Changing email or password in the app | Password reset by email only | `user.updatePassword(to:)` after re-authenticating |
+| Replay onboarding | Shown once on first launch | Add a "Show welcome screens" button in Settings that resets `hasCompletedOnboarding` |
+
+## Later phases (8 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
@@ -127,4 +148,4 @@ These were on this list and are now in the app:
 
 ---
 
-**Not yet verified:** Phases 0–5 and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.
+**Not yet verified:** Phases 0–5, 7, and the scope bump were written without building in Xcode (the code was written on Windows). The first build on a Mac may surface small compile errors.

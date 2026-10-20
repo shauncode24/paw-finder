@@ -5,7 +5,7 @@ Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list 
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
 ## Current phase
-Phase 5 done (update this line as phases complete)
+Phase 7 done; Phase 6 (Core ML) skipped for now (update this line as phases complete)
 
 ## Setup
 - One Xcode project, one app target, no Swift packages. Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Config/`, `Models/`, `Services/`.
@@ -20,12 +20,13 @@ Phase 5 done (update this line as phases complete)
 - Pet detail (`Screens/PetDetail/`): `PetDetailView` + `PetDetailViewModel` (loads `Shelter` via `fetchShelter`, geocodes its address with `CLGeocoder`, and finds similar pets). `PhotoCarousel` has the full-screen zoom viewer; `ShelterCard` has the mini-map and contact links. `FlowLayout` (DesignSystem) wraps chips.
 - Favorites (`Screens/Favorites/`): `FavoritesStore` (environment, `@MainActor @Observable`) saves `FavoritePet` snapshots + `PetCollection`s to `Documents/favorites.json`. `FavoriteButton` is the animated heart (on `PetCard` and the detail toolbar). `refreshStatuses(using:)` re-fetches favorites to detect adopted/removed pets. Mock pet `mock-5` "gets adopted" on refresh to demo this.
 - No Core Data or unit tests yet; add them only if a phase really needs them.
-- Firebase goes in when a phase needs it (via Swift Package Manager in Xcode).
+- Firebase: the `firebase-ios-sdk` Swift package is in the project with only **FirebaseAuth** linked. Add more products (Firestore, Storage) to the target when a phase needs them. `AuthManager.configureFirebase()` only configures if `GoogleService-Info.plist` is present; otherwise the app runs guest-only.
 - Extra Info.plist keys (URL scheme `pawfinder`, background fetch, BG task ID) live in the root `Info.plist`, merged with the generated one. Simple keys like permission texts go in build settings (`INFOPLIST_KEY_...`) in the project.
 - Logging: use `Log.app/network/storage/location/notifications` (os.Logger), not `print`.
 - Deep links: `Router.handle(url)` (`pawfinder://pet/<id>`, `pawfinder://<tab>`, `pawfinder://settings`). `Route.petID` → `PetLoaderView` (uses the saved favorite first).
 - Services in the environment: `Router`, `RecentlyViewedStore`, `FavoritesStore`, `LocationService`, `\.petRepository`. `NotificationManager.shared` (local notifications), `SpotlightIndexer`, `BackgroundRefresh`, `PetCache` (offline first page per search).
 - Shelters (`Screens/Map/`, `Screens/Shelters/`): `ShelterMapView` + `ShelterMapViewModel` (search by GPS/ZIP/"Search this area", grid clustering via `ShelterCluster`, list mode). `ShelterProfileView` (`Route.shelter(id:)`). `ShelterGeocoder.shared` turns addresses into coordinates with a disk cache (Petfinder has no coordinates). `FollowedSheltersStore` (environment) + background check for new arrivals. Reusable: `ShelterMiniMap`, `ContactButtons`, `OpenStatusLabel`, `MapsLink`. `Shelter.openStatus()` reads free-text hours.
+- Accounts (`Screens/Account/`, `Screens/Onboarding/`): `AuthManager` (environment) wraps Firebase Auth: email **or username** + password (usernames map to `<name>@users.pawfinder.app`) and Sign in with Apple (capability off until there's a paid account). `ProfileStore` (environment) keeps one `AdopterProfile` (name, lifestyle answers) + avatar per user on the device, and moves the guest profile to the account on first sign-in. `OnboardingView` shows once (`@AppStorage("hasCompletedOnboarding")`). `AccountView` has sign out, export (`DataExporter`), and delete (re-auth first).
 - For now: no server in the middle and no tests.
 
 ## Rules

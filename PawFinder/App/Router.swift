@@ -30,6 +30,9 @@ enum Route: Hashable {
     case petID(String)        // from a link: loads the pet first
     case shelter(id: String)
     case followedShelters
+    case editProfile
+    case lifestyle
+    case account
     case settings
     case designSystem
 }
