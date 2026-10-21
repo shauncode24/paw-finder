@@ -4,6 +4,7 @@ import SwiftUI
 /// The Map tab: shelters near you, grouped into clusters when zoomed out.
 /// Tap a pin for a summary card; "Search this area" after moving the map.
 /// Also has a list view (easier with VoiceOver).
+/// Third iteration
 struct ShelterMapView: View {
     @State private var viewModel: ShelterMapViewModel
     @State private var position: MapCameraPosition = .automatic
@@ -74,13 +75,12 @@ struct ShelterMapView: View {
             }
         }
         .mapStyle(.standard(pointsOfInterest: .excludingAll))
-        .annotationTitles(.hidden)
         .mapControls {
             MapUserLocationButton()
             MapCompass()
             MapScaleView()
         }
-        .onMapCameraChange(frequency: .onEnd) { context in
+        .onMapCameraChange(frequency: MapCameraUpdateFrequency.onEnd) { context in
             mapCameraMoved(to: context.region)
         }
     }
