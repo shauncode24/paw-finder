@@ -41,6 +41,11 @@ final class SavedSearchesStore {
         return search
     }
 
+    func removeAll() {
+        searches = []
+        save()
+    }
+
     func delete(_ id: UUID) {
         searches.removeAll { $0.id == id }
         save()

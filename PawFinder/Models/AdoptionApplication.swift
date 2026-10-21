@@ -133,3 +133,29 @@ struct ChecklistItem: Codable, Hashable, Identifiable {
         "Plan the first few days at home: quiet space, routine",
     ].map { ChecklistItem(title: $0) }
 }
+
+// Short text summaries of the form, used by the review step and the tracker.
+// Written out step by step so Swift compiles them quickly.
+extension ApplicationForm {
+    /// "House with a yard · Own"
+    var homeSummary: String {
+        var parts: [String] = []
+        if let homeType {
+            parts.append(homeType.rawValue)
+        }
+        if let ownsHome {
+            parts.append(ownsHome ? "Own" : "Rent")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// "2 adults · Kids 6–12"
+    var householdSummary: String {
+        let adultWord: String = adultsInHome == 1 ? "adult" : "adults"
+        var text: String = "\(adultsInHome) \(adultWord)"
+        if let kids {
+            text += " · \(kids.rawValue)"
+        }
+        return text
+    }
+}

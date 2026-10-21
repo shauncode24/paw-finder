@@ -91,7 +91,7 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 
 ## Phase 6: Core ML Breed Identification
 
-**Skipped for now** (at your request). The Identify tab still shows a "Coming in Phase 6" placeholder. Everything in SPEC §8 Phase 6 is still to do: dataset, Create ML training, `BreedClassifier`, photo/camera/live modes, mixed-breed results, history, and "Find adoptable [breed]".
+**Skipped for now** (at your request). The Identify tab is now a **Breeds** hub (breed match quiz + breed browser; see Additions.md) with a "photo ID coming soon" card; photo identification can be added there later. Everything in SPEC §8 Phase 6 is still to do: dataset, Create ML training, `BreedClassifier`, photo/camera/live modes, mixed-breed results, history, and "Find adoptable [breed]".
 
 ## Phase 7: Auth & Accounts
 
@@ -108,7 +108,6 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Password reset for username accounts | Not possible (no real email). The sign-up screen says so | Ask for a recovery email, or require email accounts |
 | Email verification | Not required | `user.sendEmailVerification()` after sign-up, and check `isEmailVerified` |
 | Changing email or password in the app | Password reset by email only | `user.updatePassword(to:)` after re-authenticating |
-| Replay onboarding | Shown once on first launch | Add a "Show welcome screens" button in Settings that resets `hasCompletedOnboarding` |
 
 ## Phase 8: Cloud Sync
 

@@ -69,6 +69,15 @@ final class ApplicationsStore {
         }
     }
 
+    /// Erase every application and attachment (Settings › Erase all data).
+    func removeAll() {
+        for application in applications { NotificationManager.shared.cancelApplicationUpdates(application.id) }
+        try? FileManager.default.removeItem(at: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ApplicationFiles", isDirectory: true))
+        applications = []
+        save()
+    }
+
     func deleteDraft(_ id: UUID) {
         guard let application = application(id), application.status == .draft else { return }
         try? FileManager.default.removeItem(at: filesFolder(for: id))

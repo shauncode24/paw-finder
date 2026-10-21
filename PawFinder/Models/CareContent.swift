@@ -23,6 +23,14 @@ struct BreedGuide: Identifiable, Hashable {
     let temperament: String
     let care: String
     let goodFor: String
+
+    // Used by the breed match quiz (BreedMatcher).
+    let energyLevel: Int          // 1 = calm, 2 = moderate, 3 = very active
+    let sizeLevel: Int            // 1 = small, 2 = medium, 3 = large
+    let kidFriendly: Bool
+    let firstTimeFriendly: Bool
+    let apartmentFriendly: Bool
+    let okAloneForAWhile: Bool    // copes with a workday alone (with a walk/visit)
 }
 
 struct CareChecklist: Identifiable, Hashable {
@@ -133,35 +141,75 @@ enum CareContent {
         BreedGuide(name: "Labrador Retriever", species: .dog, size: "Large", lifespan: "10–12 years", energy: "High",
                    temperament: "Friendly, eager to please, great with families.",
                    care: "Daily exercise and play; prone to weight gain, so watch portions.",
-                   goodFor: "Active families, homes with a yard"),
+                   goodFor: "Active families, homes with a yard",
+                   energyLevel: 3, sizeLevel: 3, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: false, okAloneForAWhile: false),
         BreedGuide(name: "Beagle", species: .dog, size: "Small to medium", lifespan: "12–15 years", energy: "High",
                    temperament: "Curious, merry, follows its nose.",
                    care: "Needs walks and a secure yard; can be vocal; food-motivated.",
-                   goodFor: "Families with kids, people who enjoy walks"),
+                   goodFor: "Families with kids, people who enjoy walks",
+                   energyLevel: 3, sizeLevel: 2, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: false, okAloneForAWhile: false),
         BreedGuide(name: "German Shepherd Dog", species: .dog, size: "Large", lifespan: "9–13 years", energy: "High",
                    temperament: "Loyal, smart, protective.",
                    care: "Needs training, mental challenges, and regular brushing.",
-                   goodFor: "Experienced owners with time to train"),
+                   goodFor: "Experienced owners with time to train",
+                   energyLevel: 3, sizeLevel: 3, kidFriendly: true, firstTimeFriendly: false,
+                   apartmentFriendly: false, okAloneForAWhile: false),
         BreedGuide(name: "Golden Retriever", species: .dog, size: "Large", lifespan: "10–12 years", energy: "Medium to high",
                    temperament: "Gentle, patient, loves people.",
                    care: "Brush a few times a week; daily exercise.",
-                   goodFor: "Families and first-time owners"),
+                   goodFor: "Families and first-time owners",
+                   energyLevel: 2, sizeLevel: 3, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: false, okAloneForAWhile: false),
         BreedGuide(name: "Pit Bull Terrier", species: .dog, size: "Medium", lifespan: "12–14 years", energy: "High",
                    temperament: "Affectionate, playful, people-focused.",
                    care: "Daily exercise and training; check local housing rules.",
-                   goodFor: "Active owners who want a cuddly companion"),
+                   goodFor: "Active owners who want a cuddly companion",
+                   energyLevel: 3, sizeLevel: 2, kidFriendly: true, firstTimeFriendly: false,
+                   apartmentFriendly: true, okAloneForAWhile: false),
+        BreedGuide(name: "Chihuahua", species: .dog, size: "Small", lifespan: "14–16 years", energy: "Medium",
+                   temperament: "Big personality, devoted to one person.",
+                   care: "Short walks; keep warm; gentle handling (fragile).",
+                   goodFor: "Apartments and adults or older kids",
+                   energyLevel: 2, sizeLevel: 1, kidFriendly: false, firstTimeFriendly: true,
+                   apartmentFriendly: true, okAloneForAWhile: true),
+        BreedGuide(name: "Poodle", species: .dog, size: "Small to large", lifespan: "12–15 years", energy: "Medium",
+                   temperament: "Very smart, eager, low-shedding.",
+                   care: "Regular grooming every few weeks; enjoys training games.",
+                   goodFor: "Families, people with allergies",
+                   energyLevel: 2, sizeLevel: 2, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: true, okAloneForAWhile: false),
+        BreedGuide(name: "Greyhound", species: .dog, size: "Large", lifespan: "10–13 years", energy: "Low (indoors)",
+                   temperament: "Gentle, quiet, a famous couch potato.",
+                   care: "A couple of short walks and a safe place to sprint now and then.",
+                   goodFor: "Calm homes, apartments, first-time owners",
+                   energyLevel: 1, sizeLevel: 3, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: true, okAloneForAWhile: true),
         BreedGuide(name: "Domestic Short Hair", species: .cat, size: "Medium", lifespan: "12–18 years", energy: "Medium",
                    temperament: "Varies a lot: often easygoing and adaptable.",
                    care: "Low grooming; play daily; yearly vet visits.",
-                   goodFor: "Almost any home, including apartments"),
+                   goodFor: "Almost any home, including apartments",
+                   energyLevel: 2, sizeLevel: 2, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: true, okAloneForAWhile: true),
         BreedGuide(name: "Siamese", species: .cat, size: "Medium", lifespan: "12–20 years", energy: "High",
                    temperament: "Talkative, social, very attached to people.",
                    care: "Needs company and play; doesn't like being alone all day.",
-                   goodFor: "People who are home a lot"),
+                   goodFor: "People who are home a lot",
+                   energyLevel: 3, sizeLevel: 2, kidFriendly: true, firstTimeFriendly: false,
+                   apartmentFriendly: true, okAloneForAWhile: false),
         BreedGuide(name: "Maine Coon", species: .cat, size: "Large", lifespan: "12–15 years", energy: "Medium",
                    temperament: "Gentle giant, friendly, good with kids and dogs.",
                    care: "Brush a few times a week; lots of space to climb.",
-                   goodFor: "Families and multi-pet homes"),
+                   goodFor: "Families and multi-pet homes",
+                   energyLevel: 2, sizeLevel: 3, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: true, okAloneForAWhile: true),
+        BreedGuide(name: "Ragdoll", species: .cat, size: "Large", lifespan: "12–17 years", energy: "Low",
+                   temperament: "Relaxed, floppy, loves to be held.",
+                   care: "Brush weekly; an indoor cat that enjoys calm homes.",
+                   goodFor: "Quiet homes, first-time cat owners",
+                   energyLevel: 1, sizeLevel: 3, kidFriendly: true, firstTimeFriendly: true,
+                   apartmentFriendly: true, okAloneForAWhile: true),
     ]
 
     static let checklists: [CareChecklist] = [

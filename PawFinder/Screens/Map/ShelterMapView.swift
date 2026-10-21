@@ -46,35 +46,30 @@ struct ShelterMapView: View {
         }
         .task {
             // Start near the user if they've already allowed location.
-            if case .needsLocation = viewModel.state,
-               [.authorizedWhenInUse, .authorizedAlways].contains(locationService.authorizationStatus) {
+            if case .needsLocation = viewModel.state, hasLocationPermission {
                 await searchNearMe()
             }
         }
     }
 
+    private var hasLocationPermission: Bool {
+        let status = locationService.authorizationStatus
+        return status == .authorizedWhenInUse || status == .authorizedAlways
+    }
+
     // MARK: - Map
+
+    /// Pins and clusters for the current zoom level.
+    private var clusters: [ShelterCluster] {
+        ShelterCluster.make(from: visible, coordinates: viewModel.coordinates, region: visibleRegion)
+    }
 
     private var map: some View {
         Map(position: $position) {
             UserAnnotation()
-            ForEach(ShelterCluster.make(from: visible, coordinates: viewModel.coordinates, region: visibleRegion)) { cluster in
-                Annotation(cluster.shelters.count == 1 ? cluster.shelters[0].name : "",
-                           coordinate: cluster.coordinate) {
-                    if cluster.shelters.count == 1 {
-                        ShelterPin(isSelected: cluster.shelters[0].id == selectedShelterID,
-                                   isFollowed: followed.isFollowing(cluster.shelters[0].id))
-                            .onTapGesture {
-                                withAnimation { selectedShelterID = cluster.shelters[0].id }
-                            }
-                            .accessibilityLabel(cluster.shelters[0].name)
-                            .accessibilityAddTraits(.isButton)
-                    } else {
-                        ClusterBubble(count: cluster.shelters.count)
-                            .onTapGesture { zoom(into: cluster) }
-                            .accessibilityLabel("\(cluster.shelters.count) shelters. Double tap to zoom in.")
-                            .accessibilityAddTraits(.isButton)
-                    }
+            ForEach(clusters) { cluster in
+                Annotation(cluster.annotationTitle, coordinate: cluster.coordinate) {
+                    annotationContent(for: cluster)
                 }
             }
         }
@@ -86,14 +81,41 @@ struct ShelterMapView: View {
             MapScaleView()
         }
         .onMapCameraChange(frequency: .onEnd) { context in
-            visibleRegion = context.region
-            if let center = viewModel.searchCenter {
-                let moved = CLLocation(latitude: center.latitude, longitude: center.longitude)
-                    .distance(from: CLLocation(latitude: context.region.center.latitude,
-                                               longitude: context.region.center.longitude)) / 1609.34
-                showSearchArea = moved > context.region.radiusMiles * 0.4
-            }
+            mapCameraMoved(to: context.region)
         }
+    }
+
+    /// One shelter shows as a pin; several close together show as a numbered bubble.
+    @ViewBuilder
+    private func annotationContent(for cluster: ShelterCluster) -> some View {
+        if let shelter = cluster.singleShelter {
+            ShelterPin(isSelected: shelter.id == selectedShelterID,
+                       isFollowed: followed.isFollowing(shelter.id))
+                .onTapGesture { select(shelter) }
+                .accessibilityLabel(shelter.name)
+                .accessibilityAddTraits(.isButton)
+        } else {
+            ClusterBubble(count: cluster.shelters.count)
+                .onTapGesture { zoom(into: cluster) }
+                .accessibilityLabel("\(cluster.shelters.count) shelters. Double tap to zoom in.")
+                .accessibilityAddTraits(.isButton)
+        }
+    }
+
+    private func select(_ shelter: Shelter) {
+        withAnimation { selectedShelterID = shelter.id }
+    }
+
+    /// Remembers the visible area, and offers "Search this area" once the
+    /// map has moved well away from where the last search was centred.
+    private func mapCameraMoved(to region: MKCoordinateRegion) {
+        visibleRegion = region
+        guard let center = viewModel.searchCenter else { return }
+        let searched = CLLocation(latitude: center.latitude, longitude: center.longitude)
+        let current = CLLocation(latitude: region.center.latitude, longitude: region.center.longitude)
+        let milesMoved: Double = searched.distance(from: current) / 1609.34
+        let threshold: Double = region.radiusMiles * 0.4
+        showSearchArea = milesMoved > threshold
     }
 
     private func zoom(into cluster: ShelterCluster) {
@@ -193,22 +215,7 @@ struct ShelterMapView: View {
                 messageCard(message, icon: "exclamationmark.triangle")
             case .loaded:
                 if !showsList {
-                    if let selectedShelter {
-                        SelectedShelterCard(shelter: selectedShelter, coordinate: viewModel.coordinates[selectedShelter.id],
-                                            miles: miles(to: selectedShelter)) {
-                            withAnimation { selectedShelterID = nil }
-                        }
-                    } else if showSearchArea {
-                        PFButton(title: "Search this area") { Task { await searchVisibleArea() } }
-                            .frame(maxWidth: 220)
-                    } else {
-                        Text(summaryText)
-                            .font(.pfCaption)
-                            .foregroundStyle(Color.pfTextSecondary)
-                            .padding(.horizontal, Spacing.md)
-                            .padding(.vertical, Spacing.xs)
-                            .background(.regularMaterial, in: Capsule())
-                    }
+                    loadedPanel
                 }
             }
         }
@@ -216,10 +223,33 @@ struct ShelterMapView: View {
         .padding(.bottom, Spacing.sm)
     }
 
+    /// The selected shelter's card, the "Search this area" button, or a summary.
+    @ViewBuilder
+    private var loadedPanel: some View {
+        if let shelter = selectedShelter {
+            SelectedShelterCard(shelter: shelter,
+                                coordinate: viewModel.coordinates[shelter.id],
+                                miles: miles(to: shelter),
+                                close: { withAnimation { selectedShelterID = nil } })
+        } else if showSearchArea {
+            PFButton(title: "Search this area") { Task { await searchVisibleArea() } }
+                .frame(maxWidth: 220)
+        } else {
+            Text(summaryText)
+                .font(.pfCaption)
+                .foregroundStyle(Color.pfTextSecondary)
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.xs)
+                .background(.regularMaterial, in: Capsule())
+        }
+    }
+
     private var summaryText: String {
-        var text = "\(visible.count) shelter\(visible.count == 1 ? "" : "s")"
+        let count: Int = visible.count
+        let noun: String = count == 1 ? "shelter" : "shelters"
+        var text: String = "\(count) \(noun)"
         if viewModel.isGeocoding { text += " · placing pins..." }
-        if visible.count < viewModel.shelters.count { text += " (filtered)" }
+        if count < viewModel.shelters.count { text += " (filtered)" }
         return text
     }
 
@@ -312,6 +342,31 @@ struct ShelterMapView: View {
 
 // MARK: - Pieces
 
+/// "Austin, TX · 12 mi away". Leaves out whichever part is missing.
+private func shelterDetailLine(cityState: String, miles: Double?, suffix: String) -> String {
+    var parts: [String] = []
+    if !cityState.isEmpty {
+        parts.append(cityState)
+    }
+    if let miles {
+        let rounded: Int = Int(miles.rounded())
+        parts.append("\(rounded) mi\(suffix)")
+    }
+    return parts.joined(separator: " · ")
+}
+
+private extension ShelterCluster {
+    /// The shelter, when this is a lone pin rather than a group.
+    var singleShelter: Shelter? {
+        shelters.count == 1 ? shelters.first : nil
+    }
+
+    /// Pins show their name; group bubbles have none.
+    var annotationTitle: String {
+        singleShelter?.name ?? ""
+    }
+}
+
 private struct ShelterPin: View {
     let isSelected: Bool
     let isFollowed: Bool
@@ -360,8 +415,7 @@ private struct ShelterRow: View {
                         .accessibilityLabel("Following")
                 }
             }
-            Text([shelter.cityState, miles.map { "\(Int($0.rounded())) mi" }].compactMap { $0 }.filter { !$0.isEmpty }
-                .joined(separator: " · "))
+            Text(shelterDetailLine(cityState: shelter.cityState, miles: miles, suffix: ""))
                 .font(.subheadline)
                 .foregroundStyle(Color.pfTextSecondary)
             OpenStatusLabel(shelter: shelter)
@@ -385,8 +439,7 @@ private struct SelectedShelterCard: View {
                         Text(shelter.name)
                             .font(.pfHeadline)
                             .foregroundStyle(Color.pfTextPrimary)
-                        Text([shelter.cityState, miles.map { "\(Int($0.rounded())) mi away" }]
-                            .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                        Text(shelterDetailLine(cityState: shelter.cityState, miles: miles, suffix: " away"))
                             .font(.subheadline)
                             .foregroundStyle(Color.pfTextSecondary)
                         OpenStatusLabel(shelter: shelter)

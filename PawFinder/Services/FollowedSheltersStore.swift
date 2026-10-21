@@ -44,6 +44,11 @@ final class FollowedSheltersStore {
         }
     }
 
+    func removeAll() {
+        shelters = []
+        save()
+    }
+
     func unfollow(_ shelterID: String) {
         shelters.removeAll { $0.id == shelterID }
         save()

@@ -20,6 +20,11 @@ final class CareChecklistStore {
         UserDefaults.standard.set(Array(done), forKey: key)
     }
 
+    func reset() {
+        done = []
+        UserDefaults.standard.removeObject(forKey: key)
+    }
+
     func progress(_ checklist: CareChecklist) -> Int {
         checklist.items.filter { isDone($0, in: checklist) }.count
     }
@@ -161,6 +166,7 @@ struct CareArticleView: View {
 struct BreedGuideView: View {
     let guide: BreedGuide
     @Environment(Router.self) private var router
+    @Environment(ProfileStore.self) private var profileStore
 
     var body: some View {
         ScrollView {
@@ -173,6 +179,9 @@ struct BreedGuideView: View {
                     PFChip(title: guide.size)
                     PFChip(title: "\(guide.energy) energy")
                     PFChip(title: guide.lifespan)
+                }
+                if profileStore.profile.answeredCount > 0 {
+                    lifestyleMatch
                 }
                 fact("Temperament", guide.temperament)
                 fact("Care", guide.care)
@@ -191,6 +200,31 @@ struct BreedGuideView: View {
         }
         .background(Color.pfBackground)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// "87% match" plus the reasons, from the lifestyle answers.
+    private var lifestyleMatch: some View {
+        let match = BreedMatcher.match(guide, profileStore.profile)
+        return PFCard {
+            HStack(alignment: .top, spacing: Spacing.md) {
+                MatchRing(score: match.score, size: 56)
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("Match with your lifestyle")
+                        .font(.pfHeadline)
+                        .foregroundStyle(Color.pfTextPrimary)
+                    ForEach(match.pros, id: \.self) { reason in
+                        Label(reason, systemImage: "checkmark.circle.fill")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.pfSuccess)
+                    }
+                    ForEach(match.cons, id: \.self) { reason in
+                        Label(reason, systemImage: "exclamationmark.circle")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.pfTextSecondary)
+                    }
+                }
+            }
+        }
     }
 
     private func fact(_ title: String, _ text: String) -> some View {

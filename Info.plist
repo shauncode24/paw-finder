@@ -19,6 +19,12 @@
 			</array>
 		</dict>
 	</array>
+	<!-- Launch screen: the app's background colour (light/dark), so there's no white flash -->
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>background</string>
+	</dict>
 	<!-- Background check for adopted favorites -->
 	<key>UIBackgroundModes</key>
 	<array>

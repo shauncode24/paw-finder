@@ -7,18 +7,48 @@ struct ProfileView: View {
     @Environment(ProfileStore.self) private var profileStore
     @Environment(ApplicationsStore.self) private var applications
     @Environment(MessagesStore.self) private var messages
+    @Environment(FavoritesStore.self) private var favorites
+    @Environment(FollowedSheltersStore.self) private var followed
+    @Environment(Router.self) private var router
     @State private var showAuth = false
 
     var body: some View {
         List {
             Section {
                 header
+                stats
                 if auth.user == nil {
                     PFButton(title: "Sign in or create account") { showAuth = true }
                         .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.md, trailing: Spacing.lg))
                 }
             }
             .listRowBackground(Color.pfSurface)
+
+            if !adopted.isEmpty {
+                Section("Your family 🏡") {
+                    ForEach(adopted) { application in
+                        NavigationLink(value: Route.applicationDetail(application.id)) {
+                            HStack(spacing: Spacing.md) {
+                                Color.clear
+                                    .frame(width: 44, height: 44)
+                                    .overlay { PetPhoto(url: application.pet.thumbnailURL, species: application.pet.species) }
+                                    .clipShape(Circle())
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(application.pet.name)
+                                        .font(.pfHeadline)
+                                        .foregroundStyle(Color.pfTextPrimary)
+                                    if let date = application.events.last(where: { $0.status == .adopted })?.date {
+                                        Text("Adopted \(date.formatted(date: .abbreviated, time: .omitted))")
+                                            .font(.pfCaption)
+                                            .foregroundStyle(Color.pfTextSecondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .listRowBackground(Color.pfSurface)
+            }
 
             Section("Your lifestyle") {
                 NavigationLink(value: Route.lifestyle) {
@@ -86,6 +116,9 @@ struct ProfileView: View {
                 NavigationLink(value: Route.settings) {
                     Label("Settings", systemImage: "gearshape")
                 }
+                NavigationLink(value: Route.help) {
+                    Label("Help & FAQ", systemImage: "questionmark.circle")
+                }
                 #if DEBUG
                 NavigationLink(value: Route.designSystem) {
                     Label("Design system", systemImage: "paintpalette")
@@ -96,6 +129,40 @@ struct ProfileView: View {
         }
         .scrollContentBackground(.hidden)
         .sheet(isPresented: $showAuth) { AuthSheet() }
+    }
+
+    private var adopted: [AdoptionApplication] {
+        applications.applications.filter { $0.status == .adopted }
+    }
+
+    /// "5 favorites · 1 application · 2 shelters", each tappable.
+    private var stats: some View {
+        HStack(spacing: Spacing.sm) {
+            statTile(favorites.favorites.count, "Favorites") { router.selectedTab = .favorites }
+            statTile(applications.applications.filter { $0.status != .draft }.count, "Applications") {
+                router.push(.applications)
+            }
+            statTile(followed.shelters.count, "Shelters") { router.push(.followedShelters) }
+        }
+        .padding(.bottom, Spacing.sm)
+    }
+
+    private func statTile(_ value: Int, _ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Text("\(value)")
+                    .font(.pfTitle)
+                    .foregroundStyle(Color.pfTextPrimary)
+                Text(title)
+                    .font(.pfCaption)
+                    .foregroundStyle(Color.pfTextSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, Spacing.sm)
+            .background(Color.pfBrandDeep, in: RoundedRectangle(cornerRadius: Radius.medium))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(value) \(title)")
     }
 
     private var header: some View {

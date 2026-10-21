@@ -1,6 +1,6 @@
 # PawFinder
 
-Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list and phase plan: @docs/SPEC.md. Colors (light and dark): @docs/DESIGN.md. Setup: @docs/SETUP.md. Things deliberately left out: @docs/Leftover.md.
+Native iOS (SwiftUI) pet adoption app, built as a student project. Feature list and phase plan: @docs/SPEC.md. Colors (light and dark): @docs/DESIGN.md. Setup: @docs/SETUP.md. Things deliberately left out: @docs/Leftover.md. Extra user-facing polish beyond SPEC: @docs/Additions.md.
 
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
@@ -34,6 +34,7 @@ Phases 0–5, 7, 9–11, 13 done; 14 partly (App Intents, Handoff; no extensions
 - Data fallback: with keys, `PetRepositoryFactory` returns `FallbackPetRepository` (Petfinder first, sample data if it fails). Sample IDs start with `mock-` / `shelter-`. `PetPage.isSample` drives the "sample pets" banner in Discover.
 - Phase 13: `Screens/Swipe/` (SwipeView/SwipeViewModel, `Route.swipe(filters)`), `Screens/Favorites/CompareView.swift` (`Route.compare(pets)`), `Screens/CareHub/` + `Models/CareContent.swift` (built-in content; `CareChecklistStore` in the environment). `router.showInDiscover(filters)` runs a search in Discover.
 - Phase 14: `App/AppIntents.swift` (Siri/Shortcuts; intents open deep links via `AppLinks.handler`), Handoff activity `com.pawfinder.viewPet` (declared in Info.plist). No extension targets yet (widgets, Live Activities, share, notification service).
+- Additions (see docs/Additions.md): Breeds tab (`Screens/Breeds/`, `BreedMatcher`; tab case is still `.identify`), `DiscoverHeader` (greeting, quick actions, Pet of the day), Profile stats + "Your family", `AdoptionCelebrationView`, Help/About/Privacy/Terms (`Screens/Settings/InfoPages.swift`, `SupportInfo.email` is a placeholder), Settings "Erase all data" (`removeAll()` on each store) and "Show the welcome tour again".
 - For now and later phases: **no server, no cloud, no tests.** Firebase Auth (already in) is the only cloud piece. Anything cloud-related goes to docs/Leftover.md marked *(cloud)*.
 
 ## Rules

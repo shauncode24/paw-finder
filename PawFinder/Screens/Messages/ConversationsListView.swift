@@ -3,12 +3,14 @@ import SwiftUI
 /// Profile › Messages: all chats with shelters, newest first.
 struct ConversationsListView: View {
     @Environment(MessagesStore.self) private var store
+    @Environment(Router.self) private var router
 
     var body: some View {
         Group {
             if store.conversations.isEmpty {
                 EmptyStateView(icon: "bubble.left.and.bubble.right", title: "No messages yet",
-                               message: "Have a question about a pet? Tap \"Message shelter\" on their page.")
+                               message: "Have a question about a pet? Tap \"Message shelter\" on their page.",
+                               buttonTitle: "Find a pet") { router.selectedTab = .discover }
             } else {
                 List {
                     ForEach(store.conversations) { conversation in

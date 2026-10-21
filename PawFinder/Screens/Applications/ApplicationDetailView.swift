@@ -9,6 +9,7 @@ struct ApplicationDetailView: View {
     @Environment(MessagesStore.self) private var messages
     @Environment(Router.self) private var router
     @State private var confirmWithdraw = false
+    @State private var celebrate = false
     @State private var showAnswers = false
 
     var body: some View {
@@ -70,6 +71,9 @@ struct ApplicationDetailView: View {
                 actions(application)
             }
             .padding(Spacing.lg)
+        }
+        .fullScreenCover(isPresented: $celebrate) {
+            AdoptionCelebrationView(pet: application.pet)
         }
         .confirmationDialog("Withdraw this application?", isPresented: $confirmWithdraw, titleVisibility: .visible) {
             Button("Withdraw", role: .destructive) { store.withdraw(applicationID) }
@@ -162,6 +166,7 @@ struct ApplicationDetailView: View {
             if application.status == .approved {
                 PFButton(title: "We brought \(application.pet.name) home!") {
                     store.markAdopted(applicationID)
+                    celebrate = true
                 }
             }
             if !application.isClosed {
@@ -194,8 +199,7 @@ struct ApplicationDetailView: View {
             answer("Email", form.email)
             answer("Phone", form.phone)
             answer("Address", form.address)
-            answer("Home", [form.homeType?.rawValue, form.ownsHome.map { $0 ? "Own" : "Rent" }]
-                .compactMap { $0 }.joined(separator: " · "))
+            answer("Home", form.homeSummary)
             answer("Adults at home", "\(form.adultsInHome)")
             answer("Kids", form.kids?.rawValue ?? "")
             answer("Fenced yard", form.hasFencedYard ? "Yes" : "No")

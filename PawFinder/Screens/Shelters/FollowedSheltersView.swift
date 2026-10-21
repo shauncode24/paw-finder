@@ -3,12 +3,14 @@ import SwiftUI
 /// Profile › Followed shelters. Swipe to unfollow.
 struct FollowedSheltersView: View {
     @Environment(FollowedSheltersStore.self) private var followed
+    @Environment(Router.self) private var router
 
     var body: some View {
         Group {
             if followed.shelters.isEmpty {
                 EmptyStateView(icon: "star", title: "Not following any shelters",
-                               message: "Follow a shelter from its page to hear about new pets there.")
+                               message: "Follow a shelter from its page to hear about new pets there.",
+                               buttonTitle: "Find shelters") { router.selectedTab = .map }
             } else {
                 List {
                     Section {

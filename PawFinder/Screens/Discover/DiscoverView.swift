@@ -28,6 +28,10 @@ struct DiscoverView: View {
                     sampleBanner
                 }
 
+                if viewModel.filters.isBrowsing {
+                    DiscoverHeader(filters: viewModel.filters, pool: viewModel.newestPets + viewModel.pets)
+                }
+
                 activeFilterChips
 
                 if viewModel.filters.isBrowsing {

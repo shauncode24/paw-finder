@@ -25,6 +25,16 @@ struct SettingsView: View {
 
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var confirmation: String?
+    @State private var confirmErase = false
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = true
+
+    @Environment(FavoritesStore.self) private var favorites
+    @Environment(ApplicationsStore.self) private var applications
+    @Environment(MessagesStore.self) private var messages
+    @Environment(SavedSearchesStore.self) private var savedSearches
+    @Environment(FollowedSheltersStore.self) private var followed
+    @Environment(ProfileStore.self) private var profileStore
+    @Environment(CareChecklistStore.self) private var careChecklists
 
     var body: some View {
         Form {
@@ -78,6 +88,27 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Help & info") {
+                NavigationLink(value: Route.help) { Label("Help & FAQ", systemImage: "questionmark.circle") }
+                if let url = SupportInfo.feedbackURL {
+                    Link(destination: url) { Label("Send feedback", systemImage: "envelope") }
+                }
+                NavigationLink(value: Route.privacyPolicy) { Label("Privacy Policy", systemImage: "hand.raised") }
+                NavigationLink(value: Route.terms) { Label("Terms of Use", systemImage: "doc.plaintext") }
+                NavigationLink(value: Route.about) { Label("About PawFinder", systemImage: "info.circle") }
+                Button {
+                    hasCompletedOnboarding = false
+                } label: {
+                    Label("Show the welcome tour again", systemImage: "sparkles")
+                }
+            }
+
+            Section {
+                Button("Erase all data on this phone", role: .destructive) { confirmErase = true }
+            } footer: {
+                Text("Removes favorites, collections, applications, messages, saved searches, followed shelters, your profile, and cached pets from this phone. Your account (if any) isn't deleted.")
+            }
+
             Section("About") {
                 LabeledContent("Version", value: appVersion)
                 LabeledContent("Pet data", value: Secrets.hasPetfinderKeys ? "Petfinder" : "Sample data (no API keys)")
@@ -90,12 +121,37 @@ struct SettingsView: View {
         .background(Color.pfBackground)
         .navigationTitle("Settings")
         .task { await refreshNotificationStatus() }
+        .confirmationDialog("Erase all PawFinder data on this phone?", isPresented: $confirmErase,
+                            titleVisibility: .visible) {
+            Button("Erase everything", role: .destructive) { eraseAll() }
+        } message: {
+            Text("This can't be undone.")
+        }
         .alert(confirmation ?? "", isPresented: Binding(
             get: { confirmation != nil },
             set: { if !$0 { confirmation = nil } }
         )) {
             Button("OK", role: .cancel) {}
         }
+    }
+
+    private func eraseAll() {
+        favorites.removeAll()
+        applications.removeAll()
+        messages.removeAll()
+        savedSearches.removeAll()
+        followed.removeAll()
+        recentlyViewed.clear()
+        careChecklists.reset()
+        profileStore.deleteData(for: profileStore.ownerID)
+        PetCache.clear()
+        URLCache.shared.removeAllCachedResponses()
+        UserDefaults.standard.removeObject(forKey: "swipePassedPetIDs")
+        UserDefaults.standard.removeObject(forKey: "listingReports")
+        UserDefaults.standard.removeObject(forKey: "messageReports")
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        NotificationManager.shared.updateBadge(0)
+        confirmation = "All PawFinder data on this phone was erased."
     }
 
     private func refreshNotificationStatus() async {
@@ -129,4 +185,11 @@ struct SettingsView: View {
     NavigationStack { SettingsView() }
         .environment(RecentlyViewedStore())
         .environment(LocationService())
+        .environment(FavoritesStore(fileName: "preview-favorites.json"))
+        .environment(ApplicationsStore())
+        .environment(MessagesStore())
+        .environment(SavedSearchesStore())
+        .environment(FollowedSheltersStore())
+        .environment(ProfileStore())
+        .environment(CareChecklistStore())
 }

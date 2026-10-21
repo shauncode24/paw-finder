@@ -97,6 +97,11 @@ final class MessagesStore {
         save()
     }
 
+    /// Erase every chat (Settings › Erase all data).
+    func removeAll() {
+        conversations.map(\.id).forEach(delete)
+    }
+
     func delete(_ id: UUID) {
         guard let conversation = conversation(id) else { return }
         for file in conversation.messages.compactMap(\.imageFile) {

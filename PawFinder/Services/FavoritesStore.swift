@@ -104,6 +104,13 @@ final class FavoritesStore {
         save()
     }
 
+    /// Erase all favorites, collections, and saved photos (Settings › Erase all data).
+    func removeAll() {
+        remove(petIDs: favorites.map(\.id))
+        collections = []
+        save(reindex: true)
+    }
+
     // MARK: - Collections
 
     @discardableResult

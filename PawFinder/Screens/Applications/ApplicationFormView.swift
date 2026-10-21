@@ -248,10 +248,8 @@ struct ApplicationFormView: View {
             editButton(.aboutYou)
         }
         Section("Home") {
-            summaryRow("Home", [form.homeType?.rawValue, form.ownsHome.map { $0 ? "Own" : "Rent" }]
-                .compactMap { $0 }.joined(separator: " · "))
-            summaryRow("Household", "\(form.adultsInHome) adult\(form.adultsInHome == 1 ? "" : "s")"
-                + (form.kids.map { " · \($0.rawValue)" } ?? ""))
+            summaryRow("Home", form.homeSummary)
+            summaryRow("Household", form.householdSummary)
             editButton(.home)
         }
         Section("Pets & plans") {

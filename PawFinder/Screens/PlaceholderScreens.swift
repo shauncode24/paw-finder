@@ -13,7 +13,7 @@ struct TabHomeView: View {
             case .map:
                 ShelterMapView(repository: petRepository)
             case .identify:
-                EmptyStateView(icon: "camera.viewfinder", title: "Identify a breed", message: "Coming in Phase 6.")
+                BreedsHubView()
             case .favorites:
                 FavoritesView()
             case .profile:
@@ -78,6 +78,14 @@ struct RouteView: View {
             if let guide = CareContent.breedGuides.first(where: { $0.name == name }) {
                 BreedGuideView(guide: guide)
             }
+        case .help:
+            HelpView()
+        case .about:
+            AboutView()
+        case .privacyPolicy:
+            LegalTextView.privacy
+        case .terms:
+            LegalTextView.terms
         case .careChecklist(let id):
             if let checklist = CareContent.checklists.first(where: { $0.id == id }) {
                 CareChecklistView(checklist: checklist)

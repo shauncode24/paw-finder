@@ -3,12 +3,14 @@ import SwiftUI
 /// Profile › My applications: drafts, active, and closed applications.
 struct ApplicationsListView: View {
     @Environment(ApplicationsStore.self) private var store
+    @Environment(Router.self) private var router
 
     var body: some View {
         Group {
             if store.applications.isEmpty {
                 EmptyStateView(icon: "doc.text", title: "No applications yet",
-                               message: "Found a pet you love? Tap \"Apply to adopt\" on their page.")
+                               message: "Found a pet you love? Tap \"Apply to adopt\" on their page.",
+                               buttonTitle: "Browse pets") { router.selectedTab = .discover }
             } else {
                 List {
                     section("Drafts", store.applications.filter { $0.status == .draft })

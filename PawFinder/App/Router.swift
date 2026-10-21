@@ -7,7 +7,7 @@ enum AppTab: String, Hashable, CaseIterable {
         switch self {
         case .discover: "Discover"
         case .map: "Map"
-        case .identify: "Identify"
+        case .identify: "Breeds"   // photo identification (Phase 6) will live here too
         case .favorites: "Favorites"
         case .profile: "Profile"
         }
@@ -17,7 +17,7 @@ enum AppTab: String, Hashable, CaseIterable {
         switch self {
         case .discover: "magnifyingglass"
         case .map: "map"
-        case .identify: "camera.viewfinder"
+        case .identify: "pawprint.circle"
         case .favorites: "heart"
         case .profile: "person.crop.circle"
         }
@@ -46,6 +46,10 @@ enum Route: Hashable {
     case careArticle(String)
     case breedGuide(String)
     case careChecklist(String)
+    case help
+    case about
+    case privacyPolicy
+    case terms
     case settings
     case designSystem
 }

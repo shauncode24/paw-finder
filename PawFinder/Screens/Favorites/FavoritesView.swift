@@ -99,7 +99,8 @@ struct FavoritesView: View {
     private var content: some View {
         if store.favorites.isEmpty {
             EmptyStateView(icon: "heart", title: "No favorites yet",
-                           message: "Tap the heart on any pet to save it here. Saved pets work offline too.")
+                           message: "Tap the heart on any pet to save it here. Saved pets work offline too.",
+                           buttonTitle: "Browse pets") { router.selectedTab = .discover }
         } else if items.isEmpty {
             EmptyStateView(icon: "folder", title: "This collection is empty",
                            message: "Add pets to it from their detail page, or long-press a pet in All.")
