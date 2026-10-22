@@ -15,6 +15,9 @@ struct Review: Identifiable, Hashable {
     var text: String
     var createdAt: Date
     var updatedAt: Date?
+    /// The lister's public reply, if they wrote one.
+    var reply: String?
+    var repliedAt: Date?
 
     static let maxTextLength = 500
     /// How long the adopter can edit their review.
@@ -41,6 +44,9 @@ struct Review: Identifiable, Hashable {
         text = (d["text"] as? String) ?? ""
         createdAt = (d["createdAt"] as? Timestamp)?.dateValue() ?? .now
         updatedAt = (d["updatedAt"] as? Timestamp)?.dateValue()
+        let replyText = (d["reply"] as? String) ?? ""
+        reply = replyText.isEmpty ? nil : replyText
+        repliedAt = (d["repliedAt"] as? Timestamp)?.dateValue()
     }
 
     /// "Priya S." rather than a full name on a public page.

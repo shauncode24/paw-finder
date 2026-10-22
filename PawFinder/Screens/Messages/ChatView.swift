@@ -14,7 +14,7 @@ struct ChatView: View {
     @State private var viewModel: ChatViewModel
 
     @State private var draft = ""
-    @State private var photoItem: PhotosPickerItem?
+    @State private var photoItems: [PhotosPickerItem] = []
     @State private var moderationWarning: String?
     @State private var blockedMessage: String?
     @State private var showReport = false
@@ -66,7 +66,7 @@ struct ChatView: View {
         // Anything new on screen counts as read.
         .onChange(of: viewModel.messages.count) { store.markRead(conversationID) }
         .onChange(of: draft) { _, text in draftChanged(text) }
-        .onChange(of: photoItem) { _, item in sendPhoto(item) }
+        .onChange(of: photoItems) { _, items in sendPhotos(items) }
         .alert("Before you send", isPresented: Binding(get: { moderationWarning != nil },
                                                        set: { if !$0 { moderationWarning = nil } })) {
             Button("Edit message", role: .cancel) {}
@@ -235,7 +235,7 @@ struct ChatView: View {
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: Spacing.sm) {
-            PhotosPicker(selection: $photoItem, matching: .images) {
+            PhotosPicker(selection: $photoItems, maxSelectionCount: 4, matching: .images) {
                 Image(systemName: "photo")
                     .font(.title3)
                     .frame(width: 44, height: 44)
@@ -356,14 +356,17 @@ struct ChatView: View {
         draft = ""
     }
 
-    private func sendPhoto(_ item: PhotosPickerItem?) {
-        guard let item else { return }
+    /// Up to four photos at once; each goes out as its own message.
+    private func sendPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
         Task {
-            if let data = try? await item.loadTransferable(type: Data.self),
-               let small = ImageCompressor.chatPhoto(from: data) {
-                store.send(text: nil, photo: small, in: conversationID)
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let small = ImageCompressor.chatPhoto(from: data) {
+                    store.send(text: nil, photo: small, in: conversationID)
+                }
             }
-            photoItem = nil
+            photoItems = []
         }
     }
 

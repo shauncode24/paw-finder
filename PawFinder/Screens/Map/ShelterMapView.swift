@@ -178,7 +178,7 @@ struct ShelterMapView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.sm) {
                     ForEach(ShelterMapViewModel.distanceOptions, id: \.self) { miles in
-                        PFChip(title: "\(miles) mi", isSelected: viewModel.distance == miles) {
+                        PFChip(title: DistanceUnit.current.label(miles: miles), isSelected: viewModel.distance == miles) {
                             viewModel.distance = miles
                             Task { await researchCurrentPlace() }
                         }
@@ -349,8 +349,7 @@ private func shelterDetailLine(cityState: String, miles: Double?, suffix: String
         parts.append(cityState)
     }
     if let miles {
-        let rounded: Int = Int(miles.rounded())
-        parts.append("\(rounded) mi\(suffix)")
+        parts.append(DistanceUnit.current.text(miles: miles) + suffix)
     }
     return parts.joined(separator: " · ")
 }

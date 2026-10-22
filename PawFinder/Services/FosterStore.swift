@@ -189,6 +189,14 @@ final class FosterStore {
             "updatedAt": FieldValue.serverTimestamp(),
         ], forDocument: db.collection("fosterOffers").document(offer.id))
         if accept {
+            // The pet now has a foster: politely close the other waiting offers for it.
+            for other in offers where other.listingID == offer.listingID && other.id != offer.id
+                && other.status == .pending && other.listerID == userID {
+                batch.updateData([
+                    "status": FosterOfferStatus.declined.rawValue,
+                    "updatedAt": FieldValue.serverTimestamp(),
+                ], forDocument: db.collection("fosterOffers").document(other.id))
+            }
             batch.updateData([
                 "fosterNeeded": false,
                 "fosterByID": offer.fosterID,

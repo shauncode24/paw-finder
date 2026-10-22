@@ -17,9 +17,10 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 > - **Remote push** for chat/applications when the app is closed *(server, paid)*: needs Cloud Functions + APNs.
 > - **Favorites/collections/followed listers don't sync across devices** (Phase 8 is still skipped).
 > - **Application attachments aren't uploaded** (kept on the adopter's phone on purpose).
-> - Distances are in **miles**; add a km/mi setting for non-US users.
 > - Security rules are "good enough" for a class project, not hardened (see Listers-and-Messaging.md §14).
 > - A moderator tool for `reports`, and verified-rescue badges, are ideas listed in Listers-and-Messaging.md §13.
+>
+> **Picked up in the leftover pass** (see the table at the bottom, "Done in the leftover pass"): km/mi setting, search across descriptions and tags, email verification, change password in the app, several photos per chat pick, lister replies to reviews, auto-declining other foster offers, Compare from a pet's page, and the ADR/branching docs.
 
 ---
 
@@ -28,52 +29,48 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Left out | What we did instead | How to add it later |
 |---|---|---|
 | Swift Package modules (Core, DesignSystem, Domain, Data, Features…) | One app target, code grouped by folder | Move a folder (e.g. `DesignSystem/`) into a local Swift package once the project gets big |
-| `.xcconfig` secrets handling | `Config/Secrets.plist` (gitignored), read by `Secrets.swift` | Only worth it if you need different keys for Debug and Release builds |
+| `.xcconfig` secrets handling | Not needed any more: there are no API keys. The only config file is `GoogleService-Info.plist` (gitignored) | Only worth it if you need different Firebase projects for Debug and Release |
 | Dependency container (`AppEnvironment`) | Each service goes in through `.environment(...)` | Group services into one struct if the list keeps growing |
 | Feature flags / remote config | None | Firebase Remote Config, or a simple `enum FeatureFlag` with `UserDefaults` toggles |
 | SwiftLint / SwiftFormat | None | `brew install swiftlint`, add a `.swiftlint.yml` and a Run Script build phase |
 | GitHub Actions CI *(tests)* | None | Add `.github/workflows/ci.yml` that runs `xcodebuild build test` on `macos-15` |
-| Branch strategy doc | Not written down | Follow SPEC §14: `feature/<phase>-<name>`, one PR per feature |
+| Branch strategy doc | **Done:** [BRANCHING.md](BRANCHING.md) | |
 | Universal links (`https://pawfinder.app/pet/123`) | Custom-scheme deep links only (`pawfinder://pet/123`) | Needs a domain you own + Associated Domains (Phase 14) |
 | One app-wide error type (`AppError`) with recovery actions | `APIError` and `LocationService.LocationError`, each with user-friendly messages | Merge them if more error sources appear |
 | Swift 6 strict concurrency | Swift 5 language mode | Set `SWIFT_VERSION = 6.0` and fix the warnings |
 | String Catalogs / localization | Plain English strings | Add `Localizable.xcstrings`; Xcode extracts strings automatically (Phase 15) |
 | More button variants (tertiary, destructive) | `PFButton` has primary and secondary; destructive actions use `Button(role: .destructive)` | Add when a screen needs them |
-| Tests (unit, UI, snapshot) *(tests)* | None, no test targets | File › New › Target › Unit Testing Bundle; start with `PetFilters.queryItems` and `PetfinderAnimal.toPet()` |
-| ADRs (`docs/adr`) | None | Write short notes for big decisions (backend, ML approach) |
+| Tests (unit, UI, snapshot) *(tests)* | None, no test targets | File › New › Target › Unit Testing Bundle; start with `PetFilters.matches`, `ListingMapper` and `FosterProfile.problems` |
+| ADRs (`docs/adr`) | **Done:** three short notes in [adr/](adr/) (Firebase free plan only, photos inside Firestore, filtering on the phone) | Add one for each big decision (the ML approach when Phase 6 happens) |
 
 ## Phase 1: Networking & Data Layer
 
+Almost all of this was about the Petfinder API, which has been removed (see the note at the top). What is still true:
+
 | Left out | What we did instead | How to add it later |
 |---|---|---|
-| **API proxy so the secret never ships in the app** *(server)* | Petfinder key and secret are in `Secrets.plist`, **bundled inside the app** | A Firebase Cloud Function that holds the secret and forwards `/animals` requests; point `PetfinderClient` at it |
-| Generic `APIClient` with typed `Endpoint`s and interceptors | `PetfinderClient` built just for Petfinder | Only needed if you add a second API (e.g. RescueGroups) |
-| ETag / HTTP caching for API responses | Only the first page of each search is saved (for offline) | Use `URLCache` with the request's `cachePolicy` |
-| Full Core Data offline store (cache-then-network, staleness policy) | `PetCache` saves the first page of each search as a JSON file; shown only when offline, with a banner | Core Data/SwiftData if you need to query cached pets |
-| Generic pagination abstraction (cursor/page) | Simple `PetPage` with page numbers | Fine as is unless another API uses cursors |
-| DTO fixtures (saved JSON samples) *(tests)* | `MockPetRepository` with generated pets | Save a real `/animals` response as `animals.json` |
-| RescueGroups as an alternative provider | Petfinder only | Second repository that implements `PetRepository` |
+| Generic `APIClient` with typed endpoints | Not needed: the only backend is Firestore, behind `PetRepository` and the services | Only if a second, non-Firebase API appears |
+| Full Core Data offline store | Firestore keeps its own offline copy of what it has loaded | SwiftData if you ever need queries on cached data |
+| Unit tests with saved fixtures *(tests)* | None | Test `ListingMapper` with hand-written dictionaries |
 
 ## Phase 2: Discovery Core
 
 | Left out | What we did instead | How to add it later |
 |---|---|---|
-| Custom image pipeline (downsampling, own memory/disk cache) | `AsyncImage` + a bigger `URLCache`; cards use Petfinder's small "medium" photo | Custom `ImageLoader` actor with `NSCache` + `CGImageSourceCreateThumbnailAtIndex` |
-| Image prefetching | Photos load when a card appears | `ImageLoader.prefetch(urls)` for the next few cards |
-| Color filter | Coat, special needs, and time listed were added; color was not (colors differ per species) | Load colors from Petfinder's `/types/{type}`, show them once a species is picked |
+| Image prefetching | Photos load when a card appears (thumbnails already arrive with the feed) | `PhotoLoader.prefetch(urls)` for the next few cards |
+| Colour filter | Coat, special needs, and time listed exist; colour is free text on a listing, so it is searchable but not a filter | A list of common colours in the listing form |
 | Recently viewed in Core Data | `UserDefaults` (last 10). Opening one refreshes its data | Fine as is |
-| Breed suggestions for every species | Uses the selected species, or dogs + cats if none is selected | Load all types from `/types` |
-| Search across descriptions/tags | Name search only (Petfinder's `name` parameter) | Natural-language search is Phase 12 |
+| Breed suggestions for every species | `BreedCatalog` covers dogs, cats, rabbits and birds | Add more species lists |
+| Search across descriptions/tags | **Done in the leftover pass**: the search box matches name, breed, temperament, colours, coat, place and the story, and every word must match | Natural-language search is Phase 12 |
 | Analytics events | `os.Logger` logs only | Firebase Analytics `logEvent` once Firebase is added |
 
 ## Phase 3: Pet Detail
 
 | Left out | What we did instead | How to add it later |
 |---|---|---|
-| Universal link for sharing *(needs a domain)* | `ShareLink` shares the Petfinder listing URL (or a text message for mock pets) | Phase 14 |
-| Full description | Petfinder's API only returns a short preview; "Read more" plus "View full listing on Petfinder" | No fix; this is a Petfinder limitation |
+| Universal link for sharing *(needs a domain)* | `ShareLink` shares a text message with the pet's details | Phase 14 |
 | Compatibility score with your lifestyle | Not shown | Phase 12 (needs the lifestyle questionnaire from Phase 7) |
-| Report listing sent to a moderator *(server)* | Saved on the device only (`UserDefaults` key `listingReports`) | Write to a Firestore `reports` collection once Firebase is added |
+| A screen for moderators to read `reports` | Reports are saved in Firestore `reports`; nobody reads them in the app | Admin role (not selected) |
 | Momentum when dragging a zoomed photo | Drag stops when your finger lifts | Animate the offset with the drag's predicted end |
 
 ## Phase 4: Favorites, Collections & Offline
@@ -83,7 +80,6 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Core Data storage | One JSON file (`Documents/favorites.json`) plus saved photos in `Documents/FavoritePhotos/` | SwiftData/Core Data if the data gets large or needs queries |
 | Outbox for offline changes *(server)* | Not needed yet: favorites only live on the device | Add with cloud sync (Phase 8) |
 | Push notifications *(server)* | **Local** notifications from the background check | Phase 11 |
-| "Pending" status | Petfinder only reports adoptable/adopted/found | No fix; this is a Petfinder limitation |
 | Reordering inside a collection from the detail screen | Reorder from the Favorites tab (Edit button) | Fine as is |
 | Tests for the store *(tests)* | None | Test `FavoritesStore` with a temporary `fileName` |
 
@@ -93,16 +89,13 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 |---|---|---|
 | Continuous location updates (`AsyncStream`) | `LocationService` gets the location once when asked; the map's blue dot (`UserAnnotation`) tracks you by itself | Wrap `CLLocationUpdate.liveUpdates()` if a feature needs live tracking |
 | MapKit's built-in clustering | A simple grid clustering (`ShelterCluster.make`) that regroups when the map stops moving | `MKMapView` in a `UIViewRepresentable` with `clusteringIdentifier` |
-| Exact shelter coordinates | Petfinder doesn't send coordinates, so addresses are looked up with Apple's geocoder (saved to disk). Pins appear gradually; a shelter whose address can't be found has no pin (it's still in the list view) | No fix without coordinates from the API |
-| Big result pages | 25 shelters per search ("Load more" in the list view), because each needs geocoding and Apple limits lookups to ~50/min | Fine as is |
-| Filter shelters by which animals they have | Chips for distance, "Open now", and "Following" | Petfinder doesn't say which species a shelter has without fetching its pets |
-| Volunteer and donation links | Website, adoption policy, and Petfinder page links | Petfinder doesn't provide these; show the shelter's social links (`social_media` in the API) |
-| Shelter photo gallery | First photo as the header | Reuse `PhotoCarousel` |
+| Exact lister coordinates | Listers save a city/postcode, which is looked up with Apple's geocoder when they save their profile (city-level on purpose) | Fine as is |
+| Filter listers by which animals they have | Chips for distance, "Open now", and "Following" | Count species from the live feed |
+| Lister photo gallery | One avatar as the header | Reuse `PhotoCarousel` with a few photos |
 | Accurate "open now" | Best-effort reading of the free-text hours ("9-5", "10am-6pm", "Closed"), using the phone's time zone | Unreadable hours show nothing rather than a wrong answer |
 | Push notifications for new arrivals *(server)* | Local notifications from the background check (iOS decides when it runs) | Phase 11 |
 | Geofencing (optional in SPEC) | None | `CLMonitor` with a region around followed shelters |
-| Offline shelter search | Shelter results aren't cached (shelter profiles and coordinates are) | Save the last results like `PetCache` |
-| Mock data respects the searched location | Sample data always returns all 8 shelters; the map zooms out to fit them | Fine for testing |
+| Offline lister search | Lister profiles and coordinates are cached; Firestore's offline copy covers the rest | Fine as is |
 
 ## Phase 6: Core ML Breed Identification
 
@@ -118,11 +111,12 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Guest data merging into the account across devices | On first sign-in on a phone, the guest's profile and photo move to the account. Favorites, collections, and followed shelters stay on the phone (not tied to an account) | Phase 8 (sync) |
 | Avatar upload to the cloud (Firebase Storage) | Avatar saved on the device only (resized to 512px) | Phase 8: upload to Storage and save the URL in the user's Firestore document |
 | Profile and lifestyle answers in the cloud | Saved on the device, one per account (`ProfileStore`) | Phase 8 |
-| Server-side account deletion pipeline *(server)* | Deletes the Firebase account (with re-sign-in; Apple accounts also revoke the Apple token) and the profile on the device. There's no cloud data to delete yet | A `deleteUserData` Cloud Function once there's Firestore data |
+| Server-side account deletion pipeline *(server)* | The app deletes the account (with re-sign-in), the person's listings and photos, lister profile and foster profile, and the profile on the device. Chats, applications, reviews and journeys stay so the other person's history isn't broken | A `deleteUserData` Cloud Function |
 | Data export request handled by a server *(server)* | "Export my data" makes a JSON file on the phone and shares it | Fine for now |
-| Password reset for username accounts | Not possible (no real email). The sign-up screen says so | Ask for a recovery email, or require email accounts |
-| Email verification | Not required | `user.sendEmailVerification()` after sign-up, and check `isEmailVerified` |
-| Changing email or password in the app | Password reset by email only | `user.updatePassword(to:)` after re-authenticating |
+| Password reset for username accounts | Not possible (no real email). The sign-up screen says so; **Change password** (below) works for them while signed in | Ask for a recovery email, or require email accounts |
+| Email verification | **Done in the leftover pass:** a link is sent when an email account is created; Account shows "Your email isn't verified yet" with Send again / "I've verified". It is **not required** to use the app | Gate listing or chatting on `isEmailVerified` |
+| Changing the password in the app | **Done in the leftover pass:** Account › Change password (asks for the current one first) | |
+| Changing the email address in the app | Not built | `user.sendEmailVerification(beforeUpdatingEmail:)` |
 
 ## Phase 8: Cloud Sync
 
@@ -130,30 +124,27 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 
 ## Phase 9: Adoption Application Workflow
 
+The simulated shelter and its Cloud Function are gone: listers review applications themselves (see the note at the top). Still true:
+
 | Left out | What we did instead | How to add it later |
 |---|---|---|
-| Cloud Function for status changes + a real shelter on the other end *(server, cloud)* | A **simulated shelter** in `ApplicationsStore`: on submit it plans replies (in review after 1 min, interview after 3, decision after 6) and applies them when their time comes. It declines renters without landlord permission or 10+ hours alone; otherwise approves | A shelter dashboard + Firestore + an `onApplicationStatusChange` Cloud Function |
-| Push notifications for status changes *(server)* | Local notifications scheduled at submit time for each planned reply (cancelled if you withdraw) | Phase 11 |
 | **Live Activity** for application status | Not built: Live Activities need a Widget Extension target | Phase 14, when the widget extension is added |
-| Meet-and-greet scheduling with EventKit | A "best times to meet" text field in the form; the simulated shelter's interview note says they'll contact you | `EKEventEditViewController` to add the meeting to Calendar |
-| Uploading attachments with progress *(cloud)* | Photos (ID, lease, vet reference, other) saved on the phone only, shown in the application | Firebase Storage upload with `StorageUploadTask` progress |
-| Separate adopter profile screens (household, home type, pets, experience) | The application form asks these, pre-filled from the lifestyle questionnaire | Fine as is |
-| Applications tied to the account | Stored on the device (`Documents/applications.json`), shared by whoever uses the phone | Phase 8 (sync) |
-| Attaching PDFs / scanning documents | Photos only (from the photo library) | `fileImporter` for PDFs, `VNDocumentCameraViewController` for scanning |
+| Meet-and-greet scheduling with EventKit | Superseded by the Meet & Greet planner (Phase 17), which has its own reminder | `EKEventEditViewController` to also add it to Calendar |
+| Uploading attachments | Photos (ID, lease, vet reference, other) stay on the adopter's phone on purpose | Only if you accept storing sensitive photos online |
+| Applications tied to the account across devices | Drafts live on the phone (`Documents/applications.json`); submitted ones are in Firestore | Re-create drafts from Firestore on a new phone |
+| Attaching PDFs / scanning documents | Photos only | `fileImporter` for PDFs, `VNDocumentCameraViewController` for scanning |
 
 ## Phase 10: Messaging
 
+Chat is real now (Firestore listeners, typing, receipts, photos, report/block, offline outbox). What is left:
+
 | Left out | What we did instead | How to add it later |
 |---|---|---|
-| Real-time chat with real shelters (Firestore listeners) *(cloud)* | Chats are saved on the device; a **simulated shelter** reads your message after ~3s, shows "typing…", and replies ~7s after sending, with an answer based on keywords (visits, fees, kids, dogs, cats, health, applying…) | Firestore `conversations/{id}/messages` with snapshot listeners, plus a shelter-side app |
-| Push notifications for replies *(server)* | Local notifications scheduled when you send (hidden if that chat is open) | Phase 11 + an `onMessageCreate` Cloud Function |
+| Push notifications for replies *(server)* | Local notifications while the app is open or on iOS's background refresh | Cloud Functions + APNs |
 | Notification Service Extension (rich previews) | Not built: it needs an extension target | Add with the other extensions in Phase 14 |
-| Outbox retrying against a server *(server)* | Messages written offline wait (shown as "Waiting to send") and go out when the phone reconnects (`NetworkMonitor` + `flushOutbox()`) | Same idea, sending to Firestore |
-| Pagination from the server | All messages are on the device; the chat shows the last 40 with "Load earlier messages" | Query by date with `limit` once messages are in Firestore |
-| Real moderation *(server)* | `ContentModerator` blocks a few abusive words and warns about payment/scam phrases before sending. Reports are saved on the device (`messageReports`) | Server-side checks and a review queue |
-| Blocking across devices *(cloud)* | Blocking stops replies in that chat on this phone | Store blocks in Firestore |
-| Real read receipts | Simulated: "Delivered" after 1s, "Read" after 3s | Comes with real chat |
-| Sending messages with several photos or files | One photo per message (from the library) | `PhotosPicker` with `maxSelectionCount` |
+| Real moderation *(server)* | `ContentModerator` blocks a few abusive words and warns about payment/scam phrases before sending; reports go to Firestore `reports` | A moderator screen or server-side checks |
+| Sending messages with several photos | **Done in the leftover pass:** pick up to 4 photos at once; each is sent as its own message | |
+| Files other than photos | Not built | `fileImporter` + inline base64 would hit Firestore's 1 MB document limit quickly |
 
 ## Phase 11: Notifications & Saved Search Alerts
 
@@ -162,7 +153,6 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | APNs registration and device token management *(server)* | No remote push. Everything is a **local** notification, from the background check or scheduled ahead of time | Needs a paid Apple Developer account (Push capability), `registerForRemoteNotifications`, and a server or FCM to send pushes |
 | Server fan-out for saved searches, favorite status changes, and followed shelters *(server)* | The background check (`BackgroundRefresh`) looks for new matches, adoptions, and new arrivals on the phone and notifies | A scheduled Cloud Function (`matchSavedSearches`) |
 | Alerts arriving at a predictable time | Background checks run when iOS decides (often every few hours, less if the app is rarely used) | Only real push fixes this |
-| Saved-search alerts in sample-data mode | Sample pets never change, so saved searches don't find new matches without Petfinder keys | Use real keys to see alerts |
 | Notification actions (e.g. "Reply" or "View pet" buttons on the notification) | Tapping opens the right screen | `UNNotificationCategory` with actions |
 | Rich previews with pet photos | Text only | Notification Service Extension (Phase 14 with the other extensions) or attach the saved favorite photo with `UNNotificationAttachment` |
 | Badge synced with a server *(server)* | The app icon badge is worked out on the phone: unread messages + favorites with a status change + new saved-search matches | Fine as is |
@@ -191,7 +181,7 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Care Hub articles from remote config, with caching *(cloud)* | Articles are built into the app (`CareContent.swift`), so they work offline but need an app update to change | Firebase Remote Config or a JSON file on a server |
 | Passed pets synced across devices *(cloud)* | Passed pets are remembered on this phone (last 1,000) | Phase 8 |
 | Swiping powering recommendations | Swipes only favorite/pass for now | Phase 12: likes and passes as signals |
-| Comparing from places other than Favorites | Compare starts from Favorites | Add a "Compare" action to pet detail |
+| Comparing from places other than Favorites | **Done in the leftover pass:** a pet's ••• menu has "Compare with similar pets" | |
 
 ## Phase 14: Platform Integrations
 
@@ -200,7 +190,7 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | SPEC item | What we built |
 |---|---|
 | App Intents + Shortcuts | `AppIntents.swift`: "Find adoptable pets" (optional animal type: "Show dogs in PawFinder"), "Open my favorite pets", "Show shelters near me", "Open my messages". They appear in the Shortcuts app and work with Siri without setup |
-| Handoff | The pet detail screen advertises a `com.pawfinder.viewPet` activity; another device signed in to the same Apple ID can continue it (and a Mac can open the Petfinder page in Safari) |
+| Handoff | The pet detail screen advertises a `com.pawfinder.viewPet` activity; another device signed in to the same Apple ID can continue it |
 | Spotlight | Already done in the scope bump (favorites are searchable) |
 | Deep links | Already done; Siri intents also use them (`pawfinder://discover?species=dog`, `pawfinder://messages`) |
 
@@ -216,13 +206,9 @@ Each item notes **what we did instead** and **how to add it later**. Items that 
 | Universal links (`https://pawfinder.app/pet/123`) | Needs a domain you own + Associated Domains (paid account) | Host `apple-app-site-association`, add the entitlement |
 | iPad split-view layout (`NavigationSplitView`) | Optional in SPEC; the tab layout already works on iPad | A `NavigationSplitView` for regular width |
 
-## Sample data (works until the APIs are online)
+## Sample data
 
-The app always has something to show:
-- **No Petfinder keys:** everything runs on the built-in sample data (`MockPetRepository`): 25 pets (with placeholder photos from placedog.net / cataas.com, falling back to a paw icon), 8 shelters with hours and addresses, breed lists, and Discover shows a "You're seeing sample pets" banner.
-- **Keys present, but Petfinder down / offline with nothing cached / bad keys:** `FallbackPetRepository` quietly switches to the same sample data, with a "Petfinder isn't reachable" banner, instead of an error screen.
-- **Simulated shelter:** applications (Phase 9) and messages (Phase 10) always use the simulated shelter, so they work without any backend.
-- **Built in:** Care Hub content, breed guides, and checklists.
+There is no built-in sample data any more: Discover shows what people have listed (or "No pets listed yet"). `MockPetRepository` is used only by SwiftUI previews. Built in: Care Hub content, breed guides, and checklists.
 
 ## Phase 17: Meet & Greet Planner (MapKit)
 
@@ -247,7 +233,7 @@ The app always has something to show:
 
 | Left out / simplified | Why | How to add it later |
 |---|---|---|
-| Lister replies to reviews | Keep it small | A `reply` field the lister can write (new rule branch) |
+| Lister replies to reviews | **Done in the leftover pass:** one public reply per review, which the lister can edit or remove | |
 | Lister confirms the adoption before a review counts | Today the adopter marks it adopted themselves, so fake adoptions are possible | Add a "Confirmed by lister" status (Phase 19 fits) |
 | Totals reduced when a review's author deletes their account | Needs a server (Cloud Functions) | Out of scope |
 | Review photos, helpful votes, sorting | Not needed | |
@@ -281,7 +267,7 @@ The app always has something to show:
 | Background checks, foster agreements, documents | Not possible without a real vetting process | Out of scope |
 | Supplies, donations, stipends, vet-cost tracking | Out of scope | |
 | Clustering on the foster map | Few volunteers per area | Reuse `PetCluster` with a generic item type |
-| Auto-declining other offers after one is accepted | Kept manual | Add to `FosterStore.respond` |
+| Auto-declining other offers after one is accepted | **Done in the leftover pass:** accepting an offer declines the other waiting ones for that pet in the same step | |
 | A foster's own "My foster pets" screen | The pet's page and the offer show it | Query listings by `fosterByID` (needs an index) |
 | Ending a placement from the foster's side | The lister controls the listing | Rule branch for the foster |
 | Visible-to-listers check is "has a lister profile" | Anyone can become a lister | Admin-approved listers (Admin role was not selected) |
@@ -293,6 +279,25 @@ The app always has something to show:
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 
 ---
+
+## Done in the leftover pass
+
+Picked up from the tables above because they needed no server, no paid plan and no extension target:
+
+| Item | Where |
+|---|---|
+| Kilometres or miles (Settings › Units); chips, cards, lists and maps follow it. Searching still works in miles internally | `Models/DistanceUnit.swift`, `SettingsView`, and every place that shows a distance |
+| Search matches descriptions, temperament, colours, coat, place and age/size, and needs every typed word to match | `PetFilters.matches` in `Models/Listing.swift` |
+| Email verification (link sent on sign-up, status and re-send in Account; not required to use the app) | `AuthManager`, `AccountView` |
+| Change password in the app | `AuthManager.changePassword`, `ChangePasswordSheet` |
+| Up to four photos per pick in chat | `ChatView.sendPhotos` |
+| Lister replies to reviews (+ rule) | `Review.reply`, `ReviewsService.reply`, `ReviewReplySheet`, `firestore.rules` |
+| Accepting a foster offer declines the others | `FosterStore.respond` |
+| "Compare with similar pets" from a pet's page | `PetDetailView` |
+| Branching notes and architecture decision records | `docs/BRANCHING.md`, `docs/adr/` |
+| Leftover.md cleaned up: Petfinder-era rows removed or rewritten | this file |
+
+**Considered and left out on purpose:** syncing favorites across devices (Phase 8: a big change to `FavoritesStore` that is too risky to write without compiling), "lister confirms the adoption" (changes the application flow), notification actions and rich previews (need delegate work or an extension), anything needing push, Cloud Functions, a paid Apple account or a new Xcode target.
 
 ## Done in the scope bump
 

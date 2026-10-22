@@ -105,7 +105,7 @@ struct FosterDirectoryView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Spacing.sm) {
                 ForEach(Self.radiusOptions, id: \.self) { miles in
-                    PFChip(title: miles == 0 ? "Any distance" : "\(miles) mi", isSelected: radius == miles) {
+                    PFChip(title: miles == 0 ? "Any distance" : DistanceUnit.current.label(miles: miles), isSelected: radius == miles) {
                         radius = miles
                     }
                 }
@@ -198,7 +198,7 @@ struct FosterDirectoryView: View {
     private func placeLine(_ foster: FosterProfile) -> String {
         var parts: [String] = []
         if !foster.cityState.isEmpty { parts.append(foster.cityState) }
-        if let center, let miles = miles(from: center, to: foster) { parts.append(String(format: "%.0f mi away", miles)) }
+        if let center, let miles = miles(from: center, to: foster) { parts.append(DistanceUnit.current.away(miles: miles)) }
         return parts.joined(separator: " · ")
     }
 

@@ -135,7 +135,7 @@ struct NearbyPlacesView: View {
         if let origin {
             let miles = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
                 .miles(to: place.coordinate)
-            parts.append(String(format: "%.1f mi", miles))
+            parts.append(DistanceUnit.current.text(miles: miles, decimals: 1))
         }
         if !place.address.isEmpty { parts.append(place.address) }
         return parts.joined(separator: " · ")
@@ -167,7 +167,7 @@ struct NearbyPlacesView: View {
         let found = await PlaceSearch.search(kind.query, near: location.coordinate, radiusMeters: 10000)
         places = Array(found.prefix(20))
         if places.isEmpty {
-            message = "Nothing found within about 6 miles."
+            message = "Nothing found nearby."
         } else if let region = PlaceSearch.region(fitting: places.prefix(8).map(\.coordinate) + [location.coordinate]) {
             withAnimation { position = .region(region) }
         }

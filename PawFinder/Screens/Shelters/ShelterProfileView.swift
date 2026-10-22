@@ -133,7 +133,7 @@ struct ShelterProfileView: View {
             OpenStatusLabel(shelter: shelter)
             RatingLink(shelter: shelter)
             if let miles = distance(to: shelter) {
-                Text("\(Int(miles.rounded())) miles away")
+                Text(DistanceUnit.current.away(miles: miles))
                     .font(.pfCaption)
                     .foregroundStyle(Color.pfTextSecondary)
             }

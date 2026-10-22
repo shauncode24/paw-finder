@@ -90,6 +90,11 @@ struct PetDetailView: View {
                     } else {
                         Button("Report listing", systemImage: "flag") { showReport = true }
                     }
+                    if !viewModel.similarPets.isEmpty {
+                        Button("Compare with similar pets", systemImage: "rectangle.on.rectangle") {
+                            router.push(.compare([pet] + Array(viewModel.similarPets.prefix(2))))
+                        }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -274,7 +279,7 @@ struct PetDetailView: View {
 
     private var locationText: String {
         if let distance = pet.distance {
-            return "\(pet.location) · \(Int(distance.rounded())) mi away"
+            return "\(pet.location) · \(DistanceUnit.current.away(miles: distance))"
         }
         return pet.location
     }

@@ -20,6 +20,7 @@ struct AccountView: View {
     @State private var showAppleConfirm = false
     @State private var password = ""
     @State private var isDeleting = false
+    @State private var showChangePassword = false
 
     var body: some View {
         Form {
@@ -37,6 +38,24 @@ struct AccountView: View {
                                 }
                             }
                         }
+                    }
+                    if case .email = user.signInMethod, !user.isEmailVerified {
+                        Label("Your email isn't verified yet", systemImage: "envelope.badge")
+                            .foregroundStyle(Color.pfTextPrimary)
+                        Button("Send verification email") {
+                            Task {
+                                do {
+                                    try await auth.sendVerificationEmail()
+                                    message = "Check \(user.email ?? "your inbox") for the link, then tap \"I've verified\"."
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            }
+                        }
+                        Button("I've verified my email") { Task { await auth.refreshVerification() } }
+                    }
+                    if user.signInMethod != .apple {
+                        Button("Change password") { showChangePassword = true }
                     }
                     Button("Sign out") { signOut() }
                 }
@@ -73,6 +92,7 @@ struct AccountView: View {
         .background(Color.pfBackground)
         .navigationTitle("Account")
         .task { makeExport() }
+        .sheet(isPresented: $showChangePassword) { ChangePasswordSheet() }
         .confirmationDialog("Delete your account?", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("Delete account", role: .destructive) { startDelete() }
         } message: {

@@ -210,10 +210,12 @@ struct ListerReviewsView: View {
     let listerID: String
     let listerName: String
 
+    @Environment(AuthManager.self) private var auth
     @State private var reviews: [Review] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var reporting: Review?
+    @State private var replying: Review?
 
     private var summary: RatingSummary {
         RatingSummary(sum: reviews.map(\.rating).reduce(0, +), count: reviews.count)
@@ -236,6 +238,9 @@ struct ListerReviewsView: View {
         .navigationTitle("Reviews")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(item: $replying, onDismiss: { Task { await load() } }) { review in
+            ReviewReplySheet(review: review)
+        }
         .confirmationDialog("Report this review", isPresented: Binding(get: { reporting != nil },
                                                                        set: { if !$0 { reporting = nil } }),
                             titleVisibility: .visible) {
@@ -293,6 +298,21 @@ struct ListerReviewsView: View {
                 Text(review.text)
                     .foregroundStyle(Color.pfTextPrimary)
             }
+            if let reply = review.reply {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Reply from \(listerName)")
+                        .font(.pfCaption.weight(.semibold))
+                        .foregroundStyle(Color.pfTextSecondary)
+                    Text(reply).foregroundStyle(Color.pfTextPrimary)
+                }
+                .padding(Spacing.sm)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.pfBrandDeep, in: RoundedRectangle(cornerRadius: Radius.medium))
+            }
+            if review.listerID == auth.user?.id {
+                Button(review.reply == nil ? "Reply" : "Edit your reply") { replying = review }
+                    .font(.subheadline.weight(.semibold))
+            }
             let about = review.petName.isEmpty ? "" : " · adopted \(review.petName)"
             Text("\(review.shortName)\(about) · \(review.createdAt.formatted(date: .abbreviated, time: .omitted))\(review.wasEdited ? " · edited" : "")")
                 .font(.pfCaption)
@@ -331,6 +351,66 @@ struct RatingLink: View {
             .buttonStyle(.plain)
         } else {
             RatingSummaryView(summary: shelter.rating)
+        }
+    }
+}
+
+/// The lister's public reply to a review.
+struct ReviewReplySheet: View {
+    let review: Review
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    StarRatingView(rating: Double(review.rating), size: 18)
+                    if !review.text.isEmpty {
+                        Text(review.text).foregroundStyle(Color.pfTextPrimary)
+                    }
+                    Text("Your reply is public and shown under the review. Keep it kind and brief. You can't change the review itself, but you can report it.")
+                        .font(.pfCaption)
+                        .foregroundStyle(Color.pfTextSecondary)
+                    TextEditor(text: $text)
+                        .frame(minHeight: 120)
+                        .scrollContentBackground(.hidden)
+                        .padding(Spacing.sm)
+                        .background(Color.pfSurfaceElevated, in: RoundedRectangle(cornerRadius: Radius.medium))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.medium).stroke(Color.pfBorder))
+                        .onChange(of: text) { _, value in
+                            if value.count > Review.maxTextLength { text = String(value.prefix(Review.maxTextLength)) }
+                        }
+                    if let errorMessage {
+                        Text(errorMessage).font(.subheadline).foregroundStyle(Color.pfError)
+                    }
+                    PFButton(title: review.reply == nil ? "Post reply" : "Save reply", isLoading: isSaving) {
+                        Task { await save() }
+                    }
+                }
+                .padding(Spacing.lg)
+            }
+            .background(Color.pfBackground)
+            .navigationTitle("Reply")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+            }
+            .onAppear { text = review.reply ?? "" }
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            try await ReviewsService.reply(to: review, text: text)
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

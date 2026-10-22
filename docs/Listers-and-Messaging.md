@@ -335,7 +335,7 @@ After an adoption is complete, the adopter can rate the lister from 1 to 5 stars
 - **Reports** go to the existing `reports` collection with `type: "review"`.
 - **Security rules** (re-publish `firestore.rules`):
   - A review can be created only by the adopter of that application, only when its status is `Adopted`, and only with 1-5 stars.
-  - It can be edited (stars, text) by its author for 7 days, and never deleted. The lister cannot touch it.
+  - It can be edited (stars, text) by its author for 7 days, and never deleted. The lister can only add, change or remove a single `reply` on it (the rule allows no other field).
   - `ratingSum`, `ratingCount` and `lastReviewID` on a user can **not** be set by the user themselves. They can only change together with a matching review in the same batch: a new review adds 1 to the count and its stars to the sum; an edit changes the sum by the difference.
 - A lister reviewing their own pet is blocked in the app and by the rules (the reviewer must be the application's adopter).
 
@@ -363,7 +363,7 @@ After an adoption is complete, the adopter can rate the lister from 1 to 5 stars
 ### Limits
 - Only the adopter can mark an adoption complete, so a lister and a friend could create fake adoptions to post reviews. For a class project that's fine; a real app would need the lister to confirm the adoption (see Phase 19).
 - Reviews stay after an account is deleted (the lister's total isn't reduced when a reviewer deletes their account).
-- Listers cannot reply to reviews, and reviews have no photos.
+- A lister can write one public reply under each review (**Reply** on the reviews screen) and edit or remove it; they still can't change or delete the review. Reviews have no photos.
 - The reviews screen reads at most the newest 100.
 
 ---

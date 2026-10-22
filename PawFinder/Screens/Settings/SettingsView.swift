@@ -19,6 +19,7 @@ enum AppearanceSetting: String, CaseIterable {
 /// Appearance, permissions, and clearing saved data.
 struct SettingsView: View {
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
+    @AppStorage(DistanceUnit.storageKey) private var distanceUnit: String = DistanceUnit.current.rawValue
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
     @Environment(LocationService.self) private var locationService
     @Environment(\.openURL) private var openURL
@@ -43,6 +44,17 @@ struct SettingsView: View {
                     ForEach(AppearanceSetting.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+            }
+
+            Section {
+                Picker("Distances", selection: $distanceUnit) {
+                    ForEach(DistanceUnit.allCases) { Text($0.title).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("Units")
+            } footer: {
+                Text("Only changes how distances are shown. Searches work the same.")
             }
 
             Section {

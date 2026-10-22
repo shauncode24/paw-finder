@@ -76,6 +76,12 @@ service cloud.firestore {
         && request.resource.data.rating is int
         && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
         && request.resource.data.get('text', '').size() <= 500;
+      // The lister can add, change or remove one public reply, and nothing else.
+      allow update: if signedIn()
+        && resource.data.listerID == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply', 'repliedAt'])
+        && (!('reply' in request.resource.data)
+            || (request.resource.data.reply is string && request.resource.data.reply.size() <= 500));
       allow delete: if false;
     }
 

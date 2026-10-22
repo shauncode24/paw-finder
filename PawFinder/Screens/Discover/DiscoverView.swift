@@ -322,7 +322,7 @@ struct DiscoverView: View {
             chips.append((filters.listed.rawValue, { $0.listed = .any }))
         }
         if !filters.location.isEmpty {
-            chips.append(("Within \(filters.distance) mi of \(filters.locationLabel)", {
+            chips.append(("Within \(DistanceUnit.current.label(miles: filters.distance)) of \(filters.locationLabel)", {
                 $0.location = ""
                 $0.locationName = nil
             }))

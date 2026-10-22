@@ -86,6 +86,21 @@ enum ReviewsService {
         await ListerDirectory.shared.forget(listerID)
     }
 
+    /// The lister's reply to a review (an empty reply removes it).
+    static func reply(to review: Review, text: String) async throws {
+        guard FirebaseApp.app() != nil else { throw APIError.notConfigured }
+        let clean = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Review.maxTextLength))
+        let data: [String: Any] = clean.isEmpty
+            ? ["reply": FieldValue.delete(), "repliedAt": FieldValue.delete()]
+            : ["reply": clean, "repliedAt": FieldValue.serverTimestamp()]
+        let reference = db.collection("reviews").document(review.id)
+        do {
+            try await withNetworkTimeout { try await reference.updateData(data) }
+        } catch {
+            throw backendError(error)
+        }
+    }
+
     /// Reports a review for a moderator to read.
     static func report(_ review: Review, reason: String) {
         guard FirebaseApp.app() != nil else { return }

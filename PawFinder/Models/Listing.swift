@@ -380,11 +380,28 @@ enum ListingMapper {
 // MARK: - Filtering (used on the phone, since listings arrive as a live feed)
 
 extension PetFilters {
+    /// The words a search can match: name, breed, temperament, colours, coat, place and the story.
+    fileprivate static func searchWords(of pet: Pet) -> [String] {
+        var words: [String] = [pet.name, pet.breed, pet.species, pet.location, pet.age, pet.size]
+        words.append(contentsOf: pet.tags)
+        if let colors = pet.colors { words.append(colors) }
+        if let coat = pet.coat { words.append(coat) }
+        if let description = pet.description { words.append(description) }
+        return words
+    }
+
+    /// Every word typed must appear somewhere ("calm senior beagle" finds a calm senior Beagle).
+    fileprivate func matchesQuery(_ query: String, _ pet: Pet) -> Bool {
+        let words = Self.searchWords(of: pet)
+        return query.split(separator: " ").allSatisfy { term in
+            words.contains { $0.localizedCaseInsensitiveContains(term) }
+        }
+    }
+
     /// Does this pet match everything except location (handled separately, since it needs geocoding)?
     func matches(_ pet: Pet) -> Bool {
         let query = name.trimmingCharacters(in: .whitespaces)
-        if !query.isEmpty,
-           !(pet.name.localizedCaseInsensitiveContains(query) || pet.breed.localizedCaseInsensitiveContains(query)) {
+        if !query.isEmpty, !matchesQuery(query, pet) {
             return false
         }
         if let species, pet.species != species.rawValue { return false }

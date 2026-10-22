@@ -74,7 +74,7 @@ struct PetCard: View {
 
     private var locationText: String {
         if let distance = pet.distance {
-            return "\(pet.location) · \(Int(distance.rounded())) mi"
+            return "\(pet.location) · \(DistanceUnit.current.text(miles: distance))"
         }
         return pet.location
     }

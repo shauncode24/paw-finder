@@ -97,7 +97,7 @@ struct FilterSheet: View {
                                     .foregroundStyle(Color.pfError)
                             }
                             Picker("Distance", selection: $draft.distance) {
-                                ForEach(distances, id: \.self) { Text("\($0) mi").tag($0) }
+                                ForEach(distances, id: \.self) { Text(DistanceUnit.current.label(miles: $0)).tag($0) }
                             }
                             .pickerStyle(.segmented)
                             .disabled(draft.location.isEmpty)

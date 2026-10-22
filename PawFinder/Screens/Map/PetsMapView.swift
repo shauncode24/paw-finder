@@ -177,7 +177,7 @@ struct PetsMapView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.sm) {
                     ForEach(Self.radiusOptions, id: \.self) { miles in
-                        PFChip(title: miles == 0 ? "Any distance" : "\(miles) mi", isSelected: radius == miles) {
+                        PFChip(title: miles == 0 ? "Any distance" : DistanceUnit.current.label(miles: miles), isSelected: radius == miles) {
                             radius = miles
                             selectedID = nil
                             showRadius()
@@ -401,7 +401,7 @@ private struct PetMapCard: View {
     private var detail: String {
         var parts: [String] = [pet.breed]
         if !pet.location.isEmpty { parts.append(pet.location) }
-        if let miles { parts.append(String(format: "%.0f mi away", miles)) }
+        if let miles { parts.append(DistanceUnit.current.away(miles: miles)) }
         return parts.joined(separator: " · ")
     }
 

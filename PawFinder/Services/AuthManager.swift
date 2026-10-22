@@ -9,6 +9,8 @@ struct AppUser: Equatable {
     let email: String?
     let displayName: String?
     let signInMethod: SignInMethod
+    /// Only email accounts can be unverified; username and Apple accounts count as verified.
+    var isEmailVerified = true
 
     enum SignInMethod: Equatable {
         case email
@@ -78,6 +80,8 @@ final class AuthManager {
             change.displayName = name.isEmpty ? Self.username(from: email) ?? "" : name
             try await change.commitChanges()
             try await result.user.reload()
+            // Real email addresses get a verification link (not required to use the app).
+            if Self.username(from: email) == nil { try? await result.user.sendEmailVerification() }
         }
         refreshUser()
     }
@@ -86,6 +90,29 @@ final class AuthManager {
         let email = try Self.email(for: identifier)
         guard Self.username(from: email) == nil else { throw AuthError.usernameCantReset }
         try await run { try await Auth.auth().sendPasswordReset(withEmail: email) }
+    }
+
+    /// Sends (or re-sends) the "verify your email" link.
+    func sendVerificationEmail() async throws {
+        guard let currentUser = firebaseUser, currentUser.email != nil else { throw AuthError.notConfigured }
+        try await run { try await currentUser.sendEmailVerification() }
+    }
+
+    /// Asks Firebase again whether the link was tapped.
+    func refreshVerification() async {
+        guard let currentUser = firebaseUser else { return }
+        try? await currentUser.reload()
+        refreshUser()
+    }
+
+    /// Changes the password. Firebase wants the current one first.
+    func changePassword(current: String, new: String) async throws {
+        guard let currentUser = firebaseUser, let email = currentUser.email else { throw AuthError.notConfigured }
+        try await run {
+            let credential = EmailAuthProvider.credential(withEmail: email, password: current)
+            try await currentUser.reauthenticate(with: credential)
+            try await currentUser.updatePassword(to: new)
+        }
     }
 
     func updateDisplayName(_ name: String) async {
@@ -189,7 +216,8 @@ final class AuthManager {
         let username = user.email.flatMap(Self.username(from:))
         let method: AppUser.SignInMethod = isApple ? .apple : username.map { .username($0) } ?? .email
         return AppUser(id: user.uid, email: username == nil ? user.email : nil,
-                       displayName: user.displayName, signInMethod: method)
+                       displayName: user.displayName, signInMethod: method,
+                       isEmailVerified: method == .email ? user.isEmailVerified : true)
     }
 
     /// "shaun@mail.com" stays as is; "shaun_k" becomes "shaun_k@users.pawfinder.app".
