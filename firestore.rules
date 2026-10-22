@@ -11,6 +11,9 @@
 //   conversations/{id}       a chat: only the two people in it
 //   conversations/{id}/messages/*   its messages (text, photos, meet-up proposals): only the two people in it
 //   applications/{id}        an application: the adopter and the lister it was sent to
+//   journeys/{applicationId}          an adoption journey: the adopter and the lister
+//   journeys/{id}/updates/*           its photo updates: read by both, written by the adopter
+//   happyTails/{updateId}             updates a lister features on their profile (signed-in people can read)
 //   reports/{id}             reports of listings or chats: anyone can send, nobody can read them in the app
 
 rules_version = '2';
@@ -140,6 +143,58 @@ service cloud.firestore {
                     && (resource.data.listerID == request.auth.uid
                         || (resource.data.adopterID == request.auth.uid
                             && request.resource.data.status in ['Withdrawn', 'Adopted']));
+    }
+
+    // ---- Adoption journeys ------------------------------------------------------------
+    // The journey's ID is the application's ID. The adopter creates it once the
+    // application is "Adopted" (whoever marked it so).
+    match /journeys/{applicationId} {
+      // "resource == null" lets the app check whether a journey exists before creating it.
+      allow read: if signedIn()
+                  && (resource == null
+                      || resource.data.adopterID == request.auth.uid
+                      || resource.data.listerID == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.adopterID == request.auth.uid
+        && request.resource.data.shareHappyTails is bool
+        && get(/databases/$(database)/documents/applications/$(applicationId)).data.adopterID == request.auth.uid
+        && get(/databases/$(database)/documents/applications/$(applicationId)).data.listerID == request.resource.data.listerID
+        && get(/databases/$(database)/documents/applications/$(applicationId)).data.status == 'Adopted';
+      // The only thing that changes afterwards is the adopter's sharing switch.
+      allow update: if signedIn()
+        && resource.data.adopterID == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shareHappyTails'])
+        && request.resource.data.shareHappyTails is bool;
+      allow delete: if false;
+
+      match /updates/{updateId} {
+        allow read: if signedIn()
+          && (get(/databases/$(database)/documents/journeys/$(applicationId)).data.adopterID == request.auth.uid
+              || get(/databases/$(database)/documents/journeys/$(applicationId)).data.listerID == request.auth.uid);
+        allow create: if signedIn()
+          && request.resource.data.authorID == request.auth.uid
+          && get(/databases/$(database)/documents/journeys/$(applicationId)).data.adopterID == request.auth.uid
+          && request.resource.data.get('text', '').size() <= 500;
+        allow update: if false;
+        allow delete: if signedIn()
+          && get(/databases/$(database)/documents/journeys/$(applicationId)).data.adopterID == request.auth.uid;
+      }
+    }
+
+    // ---- Happy tails -------------------------------------------------------------------
+    // The lister copies an update here to show it on their profile. This only works
+    // while the adopter's sharing switch is on; either of them can take it down.
+    match /happyTails/{updateId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.listerID == request.auth.uid
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.applicationID)).data.listerID == request.auth.uid
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.applicationID)).data.adopterID == request.resource.data.adopterID
+        && get(/databases/$(database)/documents/journeys/$(request.resource.data.applicationID)).data.shareHappyTails == true
+        && request.resource.data.get('text', '').size() <= 500;
+      allow update: if false;
+      allow delete: if signedIn()
+        && (resource.data.listerID == request.auth.uid || resource.data.adopterID == request.auth.uid);
     }
 
     // ---- Reports ------------------------------------------------------------------

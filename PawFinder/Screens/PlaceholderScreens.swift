@@ -108,6 +108,8 @@ struct RouteView: View {
             NearbyPlacesView()
         case .listerReviews(let id, let name):
             ListerReviewsView(listerID: id, listerName: name)
+        case .journey(let applicationID):
+            JourneyView(applicationID: applicationID)
         case .designSystem:
             DesignSystemPreviewView()
         }

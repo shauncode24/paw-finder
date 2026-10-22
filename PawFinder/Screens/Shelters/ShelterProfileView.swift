@@ -81,6 +81,8 @@ struct ShelterProfileView: View {
                         }
                     }
 
+                    HappyTailsSection(listerID: shelter.id)
+
                     section("Available pets") { petsGrid }
                 }
                 .padding(Spacing.lg)

@@ -56,6 +56,7 @@ enum Route: Hashable {
     case meetupMap(Meetup)          // route, travel time and Look Around for an agreed meeting place
     case nearbyPlaces               // vets, pet stores, dog parks near you
     case listerReviews(id: String, name: String)   // a lister's reviews
+    case journey(applicationID: String)            // after adoption: check-ins and photo updates
     case help
     case about
     case privacyPolicy
@@ -112,6 +113,7 @@ final class Router {
     ///     pawfinder://application/<uuid>  an adoption application
     ///     pawfinder://conversation/<id>   a chat
     ///     pawfinder://received/<id>       an application you received (as a lister)
+    ///     pawfinder://journey/<id>        an adoption journey (the application's ID)
     ///     pawfinder://search/<uuid>  run a saved search in Discover
     ///     pawfinder://discover?species=dog&q=luna   Discover with filters
     ///     pawfinder://messages       the chats list
@@ -140,6 +142,9 @@ final class Router {
         case "received":
             guard let argument else { return false }
             open(.receivedApplication(argument), in: .profile)
+        case "journey":
+            guard let argument else { return false }
+            open(.journey(applicationID: argument), in: .profile)
         case "search":
             guard let argument, let id = UUID(uuidString: argument) else { return false }
             selectedTab = .discover

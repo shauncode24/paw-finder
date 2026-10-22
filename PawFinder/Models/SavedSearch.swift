@@ -38,6 +38,7 @@ struct NotificationPreferences: Codable, Equatable {
         case savedSearches = "Saved search matches"
         case applications = "Application updates"
         case messages = "Messages from shelters"
+        case journey = "Adoption journey check-ins"
 
         var icon: String {
             switch self {
@@ -46,6 +47,7 @@ struct NotificationPreferences: Codable, Equatable {
             case .savedSearches: "magnifyingglass"
             case .applications: "doc.text"
             case .messages: "bubble.left"
+            case .journey: "heart.text.square"
             }
         }
     }

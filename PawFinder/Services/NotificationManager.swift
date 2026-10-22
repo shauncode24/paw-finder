@@ -161,6 +161,19 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                       extraInfo: ["conversationID": conversationID])
     }
 
+    /// Reminders for the Week 1, Month 1 and Month 3 check-ins of an adoption journey.
+    /// Reusing the same ID replaces the old reminder, so calling this again is safe.
+    func scheduleJourneyReminders(applicationID: String, petName: String, adoptedAt: Date) async {
+        for milestone in JourneyMilestone.allCases where milestone != .day1 {
+            let due = milestone.dueDate(adoptedAt: adoptedAt)
+            guard due > .now.addingTimeInterval(5) else { continue }
+            await deliver(.journey, id: "journey-\(applicationID)-\(milestone.rawValue)",
+                          title: "\(petName): \(milestone.shortTitle) check-in",
+                          body: milestone.reminderText(for: petName),
+                          link: "pawfinder://journey/\(applicationID)", at: due)
+        }
+    }
+
     /// "Meet Luna at Central Park in an hour." One per chat, an hour before the meet-up.
     /// Skipped when that moment has passed or quiet hours would push it past the meet-up.
     func scheduleMeetupReminder(conversationID: String, place: String, petName: String,

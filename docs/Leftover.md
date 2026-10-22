@@ -255,7 +255,24 @@ The app always has something to show:
 | A moderator screen to remove reviews | Reports are saved but nobody reads them in the app | Admin role (not selected) |
 | **Not compiled yet, rules untested** | Written on Windows; Firestore rules can't be run here | Use Firebase console > Rules > Rules Playground if a review is rejected |
 
-## Later phases (15 onwards, and 19-20)
+## Phase 19: Adoption Journey
+
+**Built:** journey page with Day 1 / Week 1 / Month 1 / Month 3 check-ins and checklists linked to Care Hub guides; photo-and-note updates; lister view of the updates; "Happy tails" featured on a lister profile with the adopter's on/off switch; check-in reminders; progress on Profile and My applications. Details in Listers-and-Messaging.md §17.
+
+| Left out / simplified | Why | How to add it later |
+|---|---|---|
+| Lister confirms the adoption | The spec didn't include it; today either side can mark Adopted | Add a "confirmed" step before a review or journey counts |
+| Telling the lister about a new update | Needs push (a server) | Local notification from a listener while the app is open |
+| Vet records, weight tracker, videos | Out of scope | |
+| Return / re-homing flow | Out of scope | |
+| Editing an update | Delete and repost | Allow `text` edits in the rules |
+| Syncing ticked tasks between devices | They live in UserDefaults | Store ticks on the journey document |
+| Reminders for someone who never reopens the app | Scheduled when the journey is created/opened | Needs push |
+| Cleaning up journeys when an account is deleted | Needs a server | Out of scope |
+| Happy tails for guests | Rules say signed-in only | Change the read rule to `if true` |
+| **Not compiled yet, rules untested** | Written on Windows | Expect small compile fixes |
+
+## Later phases (15 onwards, and 20)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 

@@ -62,6 +62,7 @@ struct NotificationPrimingView: View {
         case .savedSearches: "We'll tell you when new pets match your saved search."
         case .applications: "We'll tell you as soon as the lister updates your application."
         case .messages: "We'll let you know when the lister replies."
+        case .journey: "We'll remind you of your pet's check-ins: one week, one month and three months."
         }
     }
 }

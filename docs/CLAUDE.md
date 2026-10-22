@@ -5,7 +5,7 @@ Native iOS (SwiftUI) pet adoption app, built as a student project. **Two roles o
 **Keep it simple.** This is not production-grade. Prefer the simplest thing that works. SPEC.md, ARCHITECTURE.md, and CONVENTIONS.md describe a bigger, modular setup; use them for *what* to build, not for how much infrastructure to add.
 
 ## Current phase
-Phases 0–5, 7, 9–11, 13 done; 14 partly (App Intents, Handoff; no extensions); 6, 8, 12 skipped for now. **Then: the Petfinder API was removed and replaced by user-posted listings + real chat (docs/Listers-and-Messaging.md).** **Phase 17 (Meet & Greet Planner, MapKit) is built, see docs/Listers-and-Messaging.md §15. Phase 18 (Lister Reviews) is built, see §16 of that doc. Planned next, not built (SPEC.md §8): 19 Adoption Journey, 20 Foster Volunteers, in that order. Phase 6 (Core ML) is deferred.** (update this line as phases complete)
+Phases 0–5, 7, 9–11, 13 done; 14 partly (App Intents, Handoff; no extensions); 6, 8, 12 skipped for now. **Then: the Petfinder API was removed and replaced by user-posted listings + real chat (docs/Listers-and-Messaging.md).** **Phase 17 (Meet & Greet Planner, MapKit) is built, see docs/Listers-and-Messaging.md §15. Phases 18 (Lister Reviews) and 19 (Adoption Journey) are built, see §16 and §17 of that doc. Planned next, not built (SPEC.md §8): 20 Foster Volunteers. Phase 6 (Core ML) is deferred.** (update this line as phases complete)
 
 ## Setup
 - One Xcode project, one app target. The only package is `firebase-ios-sdk` (products: **FirebaseAuth**, **FirebaseFirestore**). Group code by folder: `App/`, `Screens/`, `DesignSystem/`, `Models/`, `Services/`.

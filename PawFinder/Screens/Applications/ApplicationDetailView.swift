@@ -200,6 +200,13 @@ struct ApplicationDetailView: View {
                 }
             }
             if application.status == .adopted {
+                NavigationLink(value: Route.journey(applicationID: applicationID.uuidString)) {
+                    Label("Open \(application.pet.name)'s journey", systemImage: "heart.text.square")
+                        .font(.pfHeadline)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(Color.pfSurfaceElevated)
+                        .background(Color.pfBrandPrimary, in: RoundedRectangle(cornerRadius: Radius.medium))
+                }
                 PFButton(title: "Rate \(application.shelterName ?? "the lister")") { showReview = true }
             }
             if !application.isClosed {

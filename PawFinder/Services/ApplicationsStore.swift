@@ -91,6 +91,7 @@ final class ApplicationsStore {
     /// Copies the lister's decisions onto my local copy, and notifies me of new ones.
     private func merge(remote data: [String: Any], id: String) {
         guard let uuid = UUID(uuidString: id), let index = index(of: uuid) else { return }
+        let previousStatus = applications[index].status
         let remoteEvents = ApplicationJSON.events(from: data["events"])
         let knownIDs = Set(applications[index].events.map(\.id))
         let newEvents = remoteEvents.filter { !knownIDs.contains($0.id) }
@@ -105,6 +106,10 @@ final class ApplicationsStore {
         if !remoteEvents.isEmpty { applications[index].events = remoteEvents }
         applications[index].updatedAt = .now
         save()
+        // The lister marked it adopted: start the journey on this phone.
+        if applications[index].status == .adopted, previousStatus != .adopted {
+            startJourney(for: applications[index])
+        }
 
         // Tell the adopter about anything the lister did (not their own submit/withdraw).
         let petName = applications[index].pet.name
@@ -275,6 +280,19 @@ final class ApplicationsStore {
         applications[index].events.append(event)
         save()
         pushStatus(of: id, status: .adopted, event: event)
+        startJourney(for: applications[index])
+    }
+
+    /// Creates the adoption journey and schedules its check-in reminders.
+    private func startJourney(for application: AdoptionApplication) {
+        guard let uid = userID else { return }
+        Task {
+            await NotificationManager.shared.askPermission(for: .journey)
+            await JourneyService.ensureJourney(for: application, adopterID: uid)
+            await NotificationManager.shared.scheduleJourneyReminders(
+                applicationID: application.id.uuidString, petName: application.pet.name,
+                adoptedAt: JourneyService.adoptedDate(of: application))
+        }
     }
 
     func toggleChecklistItem(_ itemID: UUID, in id: UUID) {

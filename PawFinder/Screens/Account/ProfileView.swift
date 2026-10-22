@@ -39,7 +39,7 @@ struct ProfileView: View {
             if !adopted.isEmpty {
                 Section("Your family 🏡") {
                     ForEach(adopted) { application in
-                        NavigationLink(value: Route.applicationDetail(application.id)) {
+                        NavigationLink(value: Route.journey(applicationID: application.id.uuidString)) {
                             HStack(spacing: Spacing.md) {
                                 Color.clear
                                     .frame(width: 44, height: 44)
@@ -49,11 +49,10 @@ struct ProfileView: View {
                                     Text(application.pet.name)
                                         .font(.pfHeadline)
                                         .foregroundStyle(Color.pfTextPrimary)
-                                    if let date = application.events.last(where: { $0.status == .adopted })?.date {
-                                        Text("Adopted \(date.formatted(date: .abbreviated, time: .omitted))")
-                                            .font(.pfCaption)
-                                            .foregroundStyle(Color.pfTextSecondary)
-                                    }
+                                    Text(JourneyProgressStore.shared.summary(for: application.id.uuidString,
+                                                                             adoptedAt: JourneyService.adoptedDate(of: application)))
+                                        .font(.pfCaption)
+                                        .foregroundStyle(Color.pfTextSecondary)
                                 }
                             }
                         }

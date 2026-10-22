@@ -405,7 +405,7 @@ Estimates assume ~10–15 hours/week. Each phase ends with a demoable build. **R
 
 ### Added after the lister/real-chat refactor (Phases 17–20)
 
-These four phases were added once the app had two real personas (adopter, lister) on Firestore. Phases 17 and 18 are **built** (not compiled yet); 19-20 are **planned, not built**. They are listed in the order to build them. The same scope rules apply: Firebase free (Spark) plan only, no server, no tests, no Storage (photos stay inline in Firestore), new access rules go in `firestore.rules` (and need re-publishing), and docs are updated per phase (Leftover.md, CLAUDE.md, Listers-and-Messaging.md). Phase 6 (Core ML) is still deferred, on purpose.
+These four phases were added once the app had two real personas (adopter, lister) on Firestore. Phases 17, 18 and 19 are **built** (not compiled yet); 20 is **planned, not built**. They are listed in the order to build them. The same scope rules apply: Firebase free (Spark) plan only, no server, no tests, no Storage (photos stay inline in Firestore), new access rules go in `firestore.rules` (and need re-publishing), and docs are updated per phase (Leftover.md, CLAUDE.md, Listers-and-Messaging.md). Phase 6 (Core ML) is still deferred, on purpose.
 
 ### Phase 17: Meet & Greet Planner (MapKit) (~1 week) **(built; not compiled yet. See Leftover.md)**
 The app's one full MapKit feature. Today's map (`ShelterMapView`) only shows lister pins; this phase makes it do real work for both personas.
@@ -428,14 +428,14 @@ The app's one full MapKit feature. Today's map (`ShelterMapView`) only shows lis
 - [x] Shown as a prompt on the "Welcome home" screen and from the application detail screen
 - Out of scope: lister replies to reviews, verified-purchase style checks, review photos
 
-### Phase 19: Adoption Journey (~1 week)
+### Phase 19: Adoption Journey (~1 week) **(built; not compiled yet. See Leftover.md)**
 What happens after "adopted". Gives both personas a reason to come back.
-- [ ] **Journey screen** (adopter) for an adopted pet: a timeline of Day 1 / Week 1 / Month 1 / Month 3 check-ins, each with a short checklist drawn from the existing Care Hub guides
-- [ ] **Post an update:** the adopter can post a photo and a short note to the journey (one photo each, compressed like chat photos, inline in Firestore: `journeys/{applicationID}/updates/{id}`)
-- [ ] **Lister sees the updates** on the application, and can choose to feature one on their profile ("Happy tails"); the adopter can switch sharing off
-- [ ] Local notifications for the next check-in date (reuses `NotificationManager.deliver`, adds a "journey" category and preference switch)
-- [ ] Journey progress shown on the Profile tab and on the adopted pet's card in My applications
-- [ ] Rules: only the adopter and that listing's lister can read a journey; only the adopter can write updates; "Happy tails" updates are readable by everyone signed in
+- [x] **Journey screen** (adopter) for an adopted pet: a timeline of Day 1 / Week 1 / Month 1 / Month 3 check-ins, each with a short checklist drawn from the existing Care Hub guides
+- [x] **Post an update:** the adopter can post a photo and a short note to the journey (one photo each, compressed like chat photos, inline in Firestore: `journeys/{applicationID}/updates/{id}`)
+- [x] **Lister sees the updates** on the application, and can choose to feature one on their profile ("Happy tails"); the adopter can switch sharing off
+- [x] Local notifications for the next check-in date (reuses `NotificationManager.deliver`, adds a "journey" category and preference switch)
+- [x] Journey progress shown on the Profile tab and on the adopted pet's card in My applications
+- [x] Rules: only the adopter and that listing's lister can read a journey; only the adopter can write updates; "Happy tails" updates are readable by everyone signed in
 - Out of scope: vet-record uploads, return/re-homing flow, video updates
 
 ### Phase 20: Foster Volunteers (~1–1.5 weeks)

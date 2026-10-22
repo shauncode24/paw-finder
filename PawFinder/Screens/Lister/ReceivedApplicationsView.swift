@@ -167,6 +167,15 @@ struct ReceivedApplicationDetailView: View {
                     }
                 }
             }
+            if application.status == .adopted {
+                NavigationLink(value: Route.journey(applicationID: application.id)) {
+                    Label("See \(application.petName)'s journey", systemImage: "heart.text.square")
+                        .font(.pfHeadline)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(Color.pfSurfaceElevated)
+                        .background(Color.pfBrandPrimary, in: RoundedRectangle(cornerRadius: Radius.medium))
+                }
+            }
             PFButton(title: "Message \(application.adopterName)", style: .secondary) {
                 openChat(with: application)
             }

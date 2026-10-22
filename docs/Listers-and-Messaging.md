@@ -365,3 +365,65 @@ After an adoption is complete, the adopter can rate the lister from 1 to 5 stars
 - Reviews stay after an account is deleted (the lister's total isn't reduced when a reviewer deletes their account).
 - Listers cannot reply to reviews, and reviews have no photos.
 - The reviews screen reads at most the newest 100.
+
+---
+
+## 17. Adoption journey (Phase 19)
+
+What happens after "adopted". The adopter gets a page for their new pet with timed check-ins and a place to share photos; the lister sees how the pet is doing and can feature the best updates on their profile as **Happy tails**.
+
+### What the user sees
+| Where | What |
+|---|---|
+| **Profile › Your family** | Each adopted pet, with progress such as "Week 1 · 2 of 4 check-ins done". Tap to open its journey. |
+| **My applications** | Adopted rows show the same progress line. |
+| **Application detail** (Adopted) | **Open <pet>'s journey** button. |
+| **Journey screen (adopter)** | Pet header ("Day 12"), the sharing switch, four check-in cards (Day 1, Week 1, Month 1, Month 3) and the updates feed with a **Share an update** button. |
+| **Check-in cards** | Locked until their date ("Opens 14 Dec"). Once open they list 3-4 short tasks to tick, many with a book button that opens the matching Care Hub guide. |
+| **Share an update** | A photo and/or up to 500 characters. Posted updates can be deleted from their context menu. |
+| **Reminders** | A local notification at 10:00 on the Week 1, Month 1 and Month 3 dates ("Luna: Week 1 check-in"). Controlled by the new "Adoption journey check-ins" switch in notification settings. |
+| **Journey screen (lister)** | Opened from **Applications received** once the status is Adopted. Shows the updates feed only; each update has **Show on your profile as a Happy tail** (or remove). |
+| **Lister profile** | A **Happy tails** strip with the featured photos and notes: "Luna found a home". Only the pet's name is shown, never the adopter's. Guests don't see it. |
+| **Sharing switch (adopter)** | "Let the lister feature my updates." Turning it off immediately takes down everything already featured. |
+
+### How it is built
+- **`journeys/{applicationID}`**: `adopterID, listerID, listingID, petName, petSpecies, adoptedAt, shareHappyTails, createdAt`. It is created by the **adopter's phone** the moment the application becomes Adopted, whether the adopter or the lister marked it (`ApplicationsStore.startJourney`), and again on opening the journey if it's missing.
+- **`journeys/{id}/updates/{updateID}`**: `authorID, text, photo (base64), createdAt`. The photo is compressed like a chat photo (about 800px). The list is read live; it only starts listening once the journey exists, because the rules look the journey up.
+- **`happyTails/{updateID}`**: a copy the lister makes of one update (text, a smaller 500px photo, pet name, `listerID`, `adopterID`, `applicationID`). It is a top-level collection so a profile page can read a lister's tails with one simple query (a query across all journeys would need a special index). The same ID as the update lets both sides know what is featured.
+- **Check-in ticks** are kept on the phone only (`JourneyProgressStore`, UserDefaults).
+- **Security rules** (re-publish `firestore.rules`):
+  - A journey can be created only by the application's adopter, only when the application is `Adopted`, and only afterwards changed by the adopter's sharing switch.
+  - Only the adopter and the lister can read a journey and its updates; only the adopter writes updates.
+  - A lister can create a Happy tail only for their own journey, only while the adopter's switch is on; the lister or the adopter can delete it. Signed-in people can read Happy tails.
+
+### Files
+| New | Purpose |
+|---|---|
+| `Models/Journey.swift` | `Journey`, `JourneyUpdate`, `HappyTail`, `JourneyMilestone` (dates and tasks), `JourneyTask` |
+| `Services/JourneyService.swift` | create journey, post/delete updates, sharing, feature/unfeature, Happy tails query; `JourneyProgressStore` |
+| `Screens/Journey/JourneyView.swift` | `JourneyViewModel`, `JourneyView`, check-in cards, update cards, `JourneyUpdateComposer`, `HappyTailsSection`, `Base64Photo` |
+
+| Changed | What |
+|---|---|
+| `Services/ApplicationsStore.swift` | starts the journey and reminders when an adoption completes (either side) |
+| `Services/NotificationManager.swift`, `Models/SavedSearch.swift`, `Screens/Notifications/NotificationPrimingView.swift` | new "journey" category and `scheduleJourneyReminders` |
+| `App/Router.swift`, `Screens/PlaceholderScreens.swift` | route `.journey(applicationID:)`, link `pawfinder://journey/<id>` |
+| `Screens/Account/ProfileView.swift`, `Applications/ApplicationsListView.swift`, `Applications/ApplicationDetailView.swift`, `Lister/ReceivedApplicationsView.swift`, `Shelters/ShelterProfileView.swift` | entry points, progress, Happy tails strip |
+| `Screens/Settings/InfoPages.swift` | FAQ entry, privacy text |
+| `firestore.rules` | `journeys`, `updates`, `happyTails` |
+
+### To try it
+1. Re-publish `firestore.rules`.
+2. With two accounts: A lists a pet, B applies, A approves, then either B taps **We brought <pet> home!** or A taps **Mark as adopted**.
+3. On B, Profile › Your family › the pet. Post an update with a photo.
+4. On A, Applications received › that application › **See <pet>'s journey**. Tap **Show on your profile as a Happy tail**, then open A's lister profile (Profile › Lister profile, or the lister page from a pet) as B or any signed-in user to see the strip.
+5. On B, switch off sharing and watch the Happy tail disappear.
+6. To see check-ins unlock without waiting, you can temporarily change `offsetDays` in `JourneyMilestone` to 0.
+
+### Limits
+- The lister isn't notified of new updates unless the app happens to be open (no push without a server); they see them when they open the journey.
+- Reminders are scheduled on the adopter's phone when the journey is created or opened. If they never open the app after the adoption, none are set.
+- The journey doesn't track weight, vet records, or videos.
+- If the adopter deletes their account, their journey and any featured Happy tails stay (the adopter can switch sharing off first).
+- Happy tails are only visible to signed-in people (guests see no strip).
+- Photos live inside Firestore documents, so a very active journey uses storage on the free plan (about 100 KB per update).

@@ -52,6 +52,12 @@ struct ApplicationsListView: View {
                     .foregroundStyle(Color.pfTextPrimary)
                 StatusBadge(status: application.status)
                     .font(.pfCaption)
+                if application.status == .adopted {
+                    Text(JourneyProgressStore.shared.summary(for: application.id.uuidString,
+                                                             adoptedAt: JourneyService.adoptedDate(of: application)))
+                        .font(.pfCaption)
+                        .foregroundStyle(Color.pfTextSecondary)
+                }
             }
         }
         .padding(.vertical, Spacing.xs)
