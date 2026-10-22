@@ -33,6 +33,8 @@ struct ApplicationFormView: View {
     @State private var showErrors = false
     @State private var submitted = false
     @State private var confirmDelete = false
+    /// The person tapped Submit while signed out; send it as soon as they have signed in.
+    @State private var submitAfterSignIn = false
 
     private var application: AdoptionApplication? { store.application(applicationID) }
 
@@ -56,6 +58,12 @@ struct ApplicationFormView: View {
         }
         .onChange(of: form) { _, newForm in
             store.updateForm(applicationID, newForm)
+        }
+        .onChange(of: auth.user?.id) { _, userID in
+            if submitAfterSignIn, userID != nil {
+                submitAfterSignIn = false
+                submit()
+            }
         }
         .alert("Couldn't send your application", isPresented: Binding(get: { submitError != nil },
                                                                     set: { if !$0 { submitError = nil } })) {
@@ -119,28 +127,49 @@ struct ApplicationFormView: View {
             case .documents: documents(application)
             case .review: review(application)
             }
-
-            if showErrors, !errors(for: step).isEmpty {
-                Section {
-                    ForEach(errors(for: step), id: \.self) { error in
-                        Label(error, systemImage: "exclamationmark.circle")
-                            .foregroundStyle(Color.pfError)
-                    }
+        }
+        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            // Multi-line answers use the Return key for new lines, so give the keyboard a way out.
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                                    to: nil, from: nil, for: nil)
                 }
             }
         }
-        .scrollContentBackground(.hidden)
     }
 
     private var navigationBar: some View {
-        HStack(spacing: Spacing.md) {
-            if step != .aboutYou {
-                PFButton(title: "Back", style: .secondary) { move(by: -1) }
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            // What is missing is shown right above the buttons, where it can't be scrolled out of sight.
+            if showErrors {
+                ForEach(errors(for: step), id: \.self) { error in
+                    Label(error, systemImage: "exclamationmark.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.pfError)
+                }
             }
-            if step == .review {
-                PFButton(title: "Submit application", isLoading: isSubmitting) { submit() }
-            } else {
-                PFButton(title: "Next") { next() }
+            if step == .review, auth.user == nil {
+                Label(auth.isConfigured
+                      ? "You'll be asked to sign in or create an account when you submit. Your answers are kept."
+                      : "Accounts aren't set up yet, so applications can't be sent. See docs/SETUP.md.",
+                      systemImage: "person.crop.circle.badge.exclamationmark")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.pfTextSecondary)
+            }
+            HStack(spacing: Spacing.md) {
+                if step != .aboutYou {
+                    PFButton(title: "Back", style: .secondary) { move(by: -1) }
+                }
+                if step == .review {
+                    PFButton(title: auth.user == nil ? "Sign in to submit" : "Submit application",
+                             isLoading: isSubmitting) { submit() }
+                } else {
+                    PFButton(title: "Next") { next() }
+                }
             }
         }
         .padding(Spacing.lg)
@@ -334,7 +363,12 @@ struct ApplicationFormView: View {
             return
         }
         // Applications go to a real person, so an account is needed. The draft is kept.
+        guard auth.isConfigured else {
+            submitError = AuthError.notConfigured.localizedDescription
+            return
+        }
         guard auth.user != nil else {
+            submitAfterSignIn = true
             router.showSignIn = true
             return
         }

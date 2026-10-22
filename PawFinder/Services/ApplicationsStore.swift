@@ -226,7 +226,12 @@ final class ApplicationsStore {
     func submit(_ id: UUID, adopterName: String) async throws {
         guard isConfigured else { throw APIError.notConfigured }
         guard let uid = userID else { throw APIError.notSignedIn }
-        guard let index = index(of: id), applications[index].status == .draft else { return }
+        guard let index = index(of: id) else {
+            throw BackendMessage(text: "This application couldn't be found on this phone.")
+        }
+        guard applications[index].status == .draft else {
+            throw BackendMessage(text: "This application was already sent. Open it from My applications to follow it.")
+        }
         let application = applications[index]
         guard application.pet.shelterID != uid else {
             throw BackendMessage(text: "This is your own listing, so you can't apply for it.")
@@ -252,7 +257,19 @@ final class ApplicationsStore {
         do {
             try await withNetworkTimeout { try await reference.setData(data) }
         } catch {
-            throw backendError(error)
+            // Say what to check, since "offline" and "no permission" are usually setup problems here.
+            let friendly = backendError(error)
+            if let api = friendly as? APIError {
+                switch api {
+                case .offline:
+                    throw BackendMessage(text: "Couldn't reach the server. If you are online, check that the Firestore database is created in your Firebase project (docs/SETUP.md, step 3), then try again. Your answers are saved.")
+                case .unauthorized:
+                    throw BackendMessage(text: "Firestore refused the application. Publish the latest firestore.rules in the Firebase console (docs/SETUP.md, step 3), then try again. Your answers are saved.")
+                default:
+                    break
+                }
+            }
+            throw friendly
         }
 
         applications[index].status = .submitted
