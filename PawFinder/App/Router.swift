@@ -55,6 +55,7 @@ enum Route: Hashable {
     case careChecklist(String)
     case meetupMap(Meetup)          // route, travel time and Look Around for an agreed meeting place
     case nearbyPlaces               // vets, pet stores, dog parks near you
+    case listerReviews(id: String, name: String)   // a lister's reviews
     case help
     case about
     case privacyPolicy

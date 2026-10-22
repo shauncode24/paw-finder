@@ -25,6 +25,8 @@ struct ListerProfile: Equatable {
     var hasAvatar = false
     var isLister = false
     var createdAt: Date?
+    /// Running total of the stars adopters gave this lister (written by the reviews, not by the owner).
+    var rating = RatingSummary()
 
     /// The name shown on listings and in chats.
     var publicName: String {
@@ -55,6 +57,7 @@ struct ListerProfile: Equatable {
         hasAvatar = (d["avatar"] as? String)?.isEmpty == false
         isLister = (d["isLister"] as? Bool) ?? false
         createdAt = (d["createdAt"] as? Timestamp)?.dateValue()
+        rating = RatingSummary(sum: (d["ratingSum"] as? Int) ?? 0, count: (d["ratingCount"] as? Int) ?? 0)
     }
 
     /// The fields to save (the avatar is handled separately, since it's large).
@@ -95,6 +98,7 @@ struct ListerProfile: Equatable {
         shelter.latitude = latitude
         shelter.longitude = longitude
         shelter.isOrganization = isOrganization
+        shelter.rating = rating
         return shelter
     }
 

@@ -241,7 +241,21 @@ The app always has something to show:
 | Photo of the meeting place in the card | Look Around is on the route screen | `MKMapSnapshotter` image |
 | **Not compiled yet** | Written on Windows | Expect a small round of compile fixes (MapKit APIs: `LookAroundPreview`, `MapPolyline(route)`, `MKLookAroundSceneRequest`) |
 
-## Later phases (15 onwards, and 18-20)
+## Phase 18: Lister Reviews
+
+**Built:** star rating plus note after an adoption, edit for 7 days, average on pet pages and lister profiles, reviews screen, report a review, Welcome home and application-detail prompts, rules that protect the totals. Details in Listers-and-Messaging.md §16.
+
+| Left out / simplified | Why | How to add it later |
+|---|---|---|
+| Lister replies to reviews | Keep it small | A `reply` field the lister can write (new rule branch) |
+| Lister confirms the adoption before a review counts | Today the adopter marks it adopted themselves, so fake adoptions are possible | Add a "Confirmed by lister" status (Phase 19 fits) |
+| Totals reduced when a review's author deletes their account | Needs a server (Cloud Functions) | Out of scope |
+| Review photos, helpful votes, sorting | Not needed | |
+| Reviews on a pet instead of a lister | Spec asked for listers | |
+| A moderator screen to remove reviews | Reports are saved but nobody reads them in the app | Admin role (not selected) |
+| **Not compiled yet, rules untested** | Written on Windows; Firestore rules can't be run here | Use Firebase console > Rules > Rules Playground if a review is rejected |
+
+## Later phases (15 onwards, and 19-20)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 

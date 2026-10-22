@@ -49,6 +49,7 @@ struct ShelterCard: View {
                         .foregroundStyle(Color.pfTextSecondary)
                 }
                 OpenStatusLabel(shelter: shelter)
+                RatingLink(shelter: shelter)
                 if let distance = distanceInMiles {
                     Text("\(Int(distance.rounded())) miles away")
                         .font(.pfCaption)

@@ -311,3 +311,57 @@ The map is no longer decoration. A lister and an adopter can agree on a place an
 - Reminders need the notification permission and respect quiet hours (skipped if quiet hours would push it past the meet-up).
 - Pets show on the pet map only if the listing has coordinates (taken from the lister's profile or the listing's city/postcode when published).
 - Dates use the phone's time zone; two people in different zones see the same moment in their own time.
+
+---
+
+## 16. Lister reviews (Phase 18)
+
+After an adoption is complete, the adopter can rate the lister from 1 to 5 stars and leave a short note. The average shows wherever the lister is shown, so the next adopter can trust (or avoid) them.
+
+### What the user sees
+| Where | What |
+|---|---|
+| **Welcome home screen** | After "We brought Luna home!", a **Rate <lister>** button (the review sheet opens once the celebration closes). |
+| **Application detail** (status Adopted) | A **Rate <lister>** button. If you already reviewed, it opens your review so you can change it. |
+| **Review sheet** | Five tappable stars, an optional note (500 characters), and a reminder that the first name and last initial are public. Reviews can be edited for 7 days, then they're final. |
+| **Pet page, lister card** | Stars and "4.8 (12 reviews)", or "No reviews yet". Tap to read them. |
+| **Lister profile** | The same line under the name. |
+| **Reviews screen** | Big average, then reviews newest first. The ••• menu on each review has **Report review** (Not a real adoption, Rude or abusive, Spam, Something else). Anyone can report, including the lister being reviewed. |
+
+### How it is built
+- **`reviews/{applicationID}`** holds one review per adoption (the document ID is the application's ID): `listerID, reviewerID, reviewerName, petName, rating, text, createdAt, updatedAt`.
+- **The lister's average** is kept on their `users/{uid}` document as `ratingSum` and `ratingCount`, updated in the **same batch** as the review with `FieldValue.increment`. Pet pages and profiles read that one document instead of every review, which keeps the free plan's read count low. `ListerProfile.rating` / `Shelter.rating` carry it to the screens.
+- **A review list** is a plain query on `listerID` (newest 100), sorted on the phone, so it needs no index.
+- **Reports** go to the existing `reports` collection with `type: "review"`.
+- **Security rules** (re-publish `firestore.rules`):
+  - A review can be created only by the adopter of that application, only when its status is `Adopted`, and only with 1-5 stars.
+  - It can be edited (stars, text) by its author for 7 days, and never deleted. The lister cannot touch it.
+  - `ratingSum`, `ratingCount` and `lastReviewID` on a user can **not** be set by the user themselves. They can only change together with a matching review in the same batch: a new review adds 1 to the count and its stars to the sum; an edit changes the sum by the difference.
+- A lister reviewing their own pet is blocked in the app and by the rules (the reviewer must be the application's adopter).
+
+### Files
+| New | Purpose |
+|---|---|
+| `Models/Review.swift` | `Review`, `RatingSummary` |
+| `Services/ReviewsService.swift` | load reviews, post/edit (one batch), report |
+| `Screens/Reviews/ReviewViews.swift` | `StarRatingView`, `RatingSummaryView`, `RatingLink`, `ReviewComposerSheet`, `ListerReviewsView` |
+
+| Changed | What |
+|---|---|
+| `Models/ListerProfile.swift`, `Models/Shelter.swift` | rating totals |
+| `Screens/Applications/ApplicationDetailView.swift` | Rate button and sheet; opens after the celebration |
+| `Screens/Settings/InfoPages.swift` | `AdoptionCelebrationView` gets an optional Rate button |
+| `Screens/PetDetail/ShelterCard.swift`, `Screens/Shelters/ShelterProfileView.swift` | rating line |
+| `App/Router.swift`, `Screens/PlaceholderScreens.swift` | route `.listerReviews(id:name:)` |
+| `firestore.rules` | `reviews` rules, protected rating fields |
+
+### To try it
+1. Re-publish `firestore.rules`.
+2. With two accounts: A lists a pet; B applies; A approves; on B tap **We brought <pet> home!** then **Rate**.
+3. On A's profile (or the pet's page) the rating appears. Edit the review on B within a week to see the average change.
+
+### Limits
+- Only the adopter can mark an adoption complete, so a lister and a friend could create fake adoptions to post reviews. For a class project that's fine; a real app would need the lister to confirm the adoption (see Phase 19).
+- Reviews stay after an account is deleted (the lister's total isn't reduced when a reviewer deletes their account).
+- Listers cannot reply to reviews, and reviews have no photos.
+- The reviews screen reads at most the newest 100.

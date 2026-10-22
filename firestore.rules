@@ -4,6 +4,8 @@
 //
 // Summary:
 //   users/{uid}              lister profiles: anyone can read, only the owner can write
+//                            (the rating totals can only change together with a review)
+//   reviews/{applicationId}  a lister's review by the adopter: anyone can read, only the adopter writes
 //   listings/{id}            pet listings: anyone can read, only the lister can write
 //   listings/{id}/photos/*   the listing's photos (stored inside Firestore, no paid Storage plan needed)
 //   conversations/{id}       a chat: only the two people in it
@@ -20,9 +22,56 @@ service cloud.firestore {
     }
 
     // ---- Lister profiles ----------------------------------------------------
+    // The rating fields belong to the reviews, so the owner can't set or change them.
+    function ratingFields() {
+      return ['ratingSum', 'ratingCount', 'lastReviewID'];
+    }
+
     match /users/{uid} {
       allow read: if true;
-      allow create, update, delete: if signedIn() && request.auth.uid == uid;
+      allow create: if signedIn() && request.auth.uid == uid
+                    && !request.resource.data.keys().hasAny(ratingFields());
+      allow update: if signedIn() && request.auth.uid == uid
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(ratingFields());
+      allow delete: if signedIn() && request.auth.uid == uid;
+      // An adopter's review changes the lister's total, in the same batch as the review:
+      //   new review  -> count + 1 and sum + rating
+      //   edit        -> count + 0 and sum + (new rating - old rating)
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(ratingFields())
+        && getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewID)).data.listerID == uid
+        && getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewID)).data.reviewerID == request.auth.uid
+        && (exists(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewID))
+            ? (request.resource.data.get('ratingCount', 0) == resource.data.get('ratingCount', 0)
+               && request.resource.data.get('ratingSum', 0) - resource.data.get('ratingSum', 0)
+                  == getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewID)).data.rating
+                     - get(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewID)).data.rating)
+            : (request.resource.data.get('ratingCount', 0) == resource.data.get('ratingCount', 0) + 1
+               && request.resource.data.get('ratingSum', 0) - resource.data.get('ratingSum', 0)
+                  == getAfter(/databases/$(database)/documents/reviews/$(request.resource.data.lastReviewID)).data.rating));
+    }
+
+    // ---- Reviews --------------------------------------------------------------
+    // The review's ID is the application's ID, so there is one review per adoption.
+    match /reviews/{applicationId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.reviewerID == request.auth.uid
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.get('text', '').size() <= 500
+        && get(/databases/$(database)/documents/applications/$(applicationId)).data.adopterID == request.auth.uid
+        && get(/databases/$(database)/documents/applications/$(applicationId)).data.listerID == request.resource.data.listerID
+        && get(/databases/$(database)/documents/applications/$(applicationId)).data.status == 'Adopted';
+      // The reviewer can change the stars and the text for 7 days.
+      allow update: if signedIn()
+        && resource.data.reviewerID == request.auth.uid
+        && request.time < resource.data.createdAt + duration.value(7, 'd')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'text', 'updatedAt'])
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.get('text', '').size() <= 500;
+      allow delete: if false;
     }
 
     // ---- Listings -----------------------------------------------------------

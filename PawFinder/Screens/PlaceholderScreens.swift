@@ -106,6 +106,8 @@ struct RouteView: View {
             MeetupMapView(meetup: meetup)
         case .nearbyPlaces:
             NearbyPlacesView()
+        case .listerReviews(let id, let name):
+            ListerReviewsView(listerID: id, listerName: name)
         case .designSystem:
             DesignSystemPreviewView()
         }

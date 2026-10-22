@@ -205,6 +205,9 @@ struct LegalTextView: View {
 /// Reduce Motion), a share button, and afterwards a polite App Store review prompt.
 struct AdoptionCelebrationView: View {
     let pet: Pet
+    /// When set, a "Rate the lister" button is shown; `onRate` runs after the screen closes.
+    var rateTitle: String? = nil
+    var onRate: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
     @Environment(Router.self) private var router
@@ -237,6 +240,12 @@ struct AdoptionCelebrationView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .foregroundStyle(Color.pfSurfaceElevated)
                         .background(Color.pfBrandPrimary, in: RoundedRectangle(cornerRadius: Radius.medium))
+                }
+                if let rateTitle, let onRate {
+                    PFButton(title: rateTitle) {
+                        onRate()
+                        dismiss()
+                    }
                 }
                 PFButton(title: "Find a vet nearby", style: .secondary) {
                     dismiss()

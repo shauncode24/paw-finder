@@ -24,6 +24,7 @@ struct Shelter: Identifiable, Hashable {
     var latitude: Double? = nil   // approximate (from the ZIP/city), set when the lister saves their profile
     var longitude: Double? = nil
     var isOrganization = false    // a rescue or shelter, rather than an individual
+    var rating = RatingSummary()  // average stars from adopters (see Review.swift)
 
     /// What to send to the geocoder: the street address, or at least city/ZIP.
     var geocodeQuery: String {

@@ -13,6 +13,9 @@ struct ApplicationDetailView: View {
     @State private var chatError: String?
     @State private var confirmWithdraw = false
     @State private var celebrate = false
+    @State private var showReview = false
+    /// Set from the celebration screen; the review sheet opens once it has closed.
+    @State private var reviewAfterCelebration = false
     @State private var showAnswers = false
 
     var body: some View {
@@ -91,8 +94,21 @@ struct ApplicationDetailView: View {
             }
             .padding(Spacing.lg)
         }
-        .fullScreenCover(isPresented: $celebrate) {
-            AdoptionCelebrationView(pet: application.pet)
+        .fullScreenCover(isPresented: $celebrate, onDismiss: {
+            if reviewAfterCelebration {
+                reviewAfterCelebration = false
+                showReview = true
+            }
+        }) {
+            AdoptionCelebrationView(pet: application.pet,
+                                    rateTitle: "Rate \(application.shelterName ?? "the lister")",
+                                    onRate: { reviewAfterCelebration = true })
+        }
+        .sheet(isPresented: $showReview) {
+            ReviewComposerSheet(applicationID: applicationID.uuidString,
+                                listerID: application.pet.shelterID,
+                                listerName: application.shelterName ?? "the lister",
+                                petName: application.pet.name)
         }
         .confirmationDialog("Withdraw this application?", isPresented: $confirmWithdraw, titleVisibility: .visible) {
             Button("Withdraw", role: .destructive) { store.withdraw(applicationID) }
@@ -182,6 +198,9 @@ struct ApplicationDetailView: View {
                     store.markAdopted(applicationID)
                     celebrate = true
                 }
+            }
+            if application.status == .adopted {
+                PFButton(title: "Rate \(application.shelterName ?? "the lister")") { showReview = true }
             }
             if !application.isClosed {
                 PFButton(title: "Message \(application.shelterName ?? "the lister")", style: .secondary) {

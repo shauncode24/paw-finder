@@ -405,7 +405,7 @@ Estimates assume ~10–15 hours/week. Each phase ends with a demoable build. **R
 
 ### Added after the lister/real-chat refactor (Phases 17–20)
 
-These four phases were added once the app had two real personas (adopter, lister) on Firestore. Phase 17 is **built** (not compiled yet); 18-20 are **planned, not built**. They are listed in the order to build them. The same scope rules apply: Firebase free (Spark) plan only, no server, no tests, no Storage (photos stay inline in Firestore), new access rules go in `firestore.rules` (and need re-publishing), and docs are updated per phase (Leftover.md, CLAUDE.md, Listers-and-Messaging.md). Phase 6 (Core ML) is still deferred, on purpose.
+These four phases were added once the app had two real personas (adopter, lister) on Firestore. Phases 17 and 18 are **built** (not compiled yet); 19-20 are **planned, not built**. They are listed in the order to build them. The same scope rules apply: Firebase free (Spark) plan only, no server, no tests, no Storage (photos stay inline in Firestore), new access rules go in `firestore.rules` (and need re-publishing), and docs are updated per phase (Leftover.md, CLAUDE.md, Listers-and-Messaging.md). Phase 6 (Core ML) is still deferred, on purpose.
 
 ### Phase 17: Meet & Greet Planner (MapKit) (~1 week) **(built; not compiled yet. See Leftover.md)**
 The app's one full MapKit feature. Today's map (`ShelterMapView`) only shows lister pins; this phase makes it do real work for both personas.
@@ -419,13 +419,13 @@ The app's one full MapKit feature. Today's map (`ShelterMapView`) only shows lis
 - [x] Plumbing: `ChatMessage` gets optional `kind`/`meetup` fields (old messages unaffected); `firestore.rules` allows only the two participants to create or update meet-up messages; no new indexes; coordinates are stored as plain numbers
 - Out of scope: live location sharing, geofencing, offline map tiles
 
-### Phase 18: Lister Reviews (~0.5–1 week)
-- [ ] After an application reaches **adopted**, the adopter can rate the lister (1–5 stars) with an optional short note. One review per application, editable for 7 days
-- [ ] Reviews collection `reviews/{applicationID}` (listerID, reviewerID, reviewerName, rating, text, createdAt). Rules: only the adopter of an *adopted* application may create; anyone signed in can read; the lister can't edit or delete (they can report)
-- [ ] Lister profile and `ShelterCard` show the average rating and review count; a "Reviews" list screen with newest first
-- [ ] Aggregate kept on the lister's `users/{uid}` doc (`ratingSum`, `ratingCount`, updated in the same batch with `FieldValue.increment`) so lists never read every review
-- [ ] Lister can report an unfair review (reuses the existing `reports` collection)
-- [ ] Shown as a prompt on the "Welcome home" screen and from the application detail screen
+### Phase 18: Lister Reviews (~0.5–1 week) **(built; not compiled yet. See Leftover.md)**
+- [x] After an application reaches **adopted**, the adopter can rate the lister (1–5 stars) with an optional short note. One review per application, editable for 7 days
+- [x] Reviews collection `reviews/{applicationID}` (listerID, reviewerID, reviewerName, rating, text, createdAt). Rules: only the adopter of an *adopted* application may create; anyone can read (profiles are public); the lister can't edit or delete (they can report)
+- [x] Lister profile and `ShelterCard` show the average rating and review count; a "Reviews" list screen with newest first
+- [x] Aggregate kept on the lister's `users/{uid}` doc (`ratingSum`, `ratingCount`, updated in the same batch with `FieldValue.increment`) so lists never read every review
+- [x] Lister can report an unfair review (reuses the existing `reports` collection)
+- [x] Shown as a prompt on the "Welcome home" screen and from the application detail screen
 - Out of scope: lister replies to reviews, verified-purchase style checks, review photos
 
 ### Phase 19: Adoption Journey (~1 week)
