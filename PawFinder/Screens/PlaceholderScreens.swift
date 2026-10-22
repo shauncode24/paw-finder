@@ -11,7 +11,7 @@ struct TabHomeView: View {
             case .discover:
                 DiscoverView(repository: petRepository)
             case .map:
-                ShelterMapView(repository: petRepository)
+                MapHomeView(repository: petRepository)
             case .identify:
                 BreedsHubView()
             case .favorites:
@@ -102,6 +102,10 @@ struct RouteView: View {
             if let checklist = CareContent.checklists.first(where: { $0.id == id }) {
                 CareChecklistView(checklist: checklist)
             }
+        case .meetupMap(let meetup):
+            MeetupMapView(meetup: meetup)
+        case .nearbyPlaces:
+            NearbyPlacesView()
         case .designSystem:
             DesignSystemPreviewView()
         }

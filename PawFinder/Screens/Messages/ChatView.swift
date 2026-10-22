@@ -1,3 +1,4 @@
+import MapKit
 import PhotosUI
 import SwiftUI
 
@@ -9,6 +10,7 @@ struct ChatView: View {
 
     @Environment(MessagesStore.self) private var store
     @Environment(NetworkMonitor.self) private var network
+    @Environment(ListingsService.self) private var listings
     @State private var viewModel: ChatViewModel
 
     @State private var draft = ""
@@ -18,6 +20,9 @@ struct ChatView: View {
     @State private var showReport = false
     @State private var reportedMessageID: String?
     @State private var confirmBlock = false
+    @State private var showMeetupPicker = false
+    /// Set when answering someone's proposal with a different place or time.
+    @State private var counteringMessageID: String?
     @State private var fullScreenImage: ViewerImage?
     @State private var lastTypingSent = Date.distantPast
     @State private var typingTask: Task<Void, Never>?
@@ -92,6 +97,32 @@ struct ChatView: View {
         }
         .fullScreenCover(item: $fullScreenImage) { image in
             ImageViewer(image: image.image)
+        }
+        .sheet(isPresented: $showMeetupPicker, onDismiss: { counteringMessageID = nil }) {
+            PlacePickerView(startCoordinate: petCoordinate, me: me) { meetup in
+                store.proposeMeetup(meetup, replacing: counteringMessageID, in: conversationID)
+            }
+        }
+    }
+
+    /// Where the pet is, so the place picker opens in the right area.
+    private var petCoordinate: CLLocationCoordinate2D? {
+        guard let conversation = store.conversation(conversationID),
+              let pet = listings.listings.first(where: { $0.id == conversation.listingID }),
+              let latitude = pet.latitude, let longitude = pet.longitude else { return nil }
+        return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    private func handleMeetup(_ action: MeetupAction, on message: ChatMessage) {
+        guard let meetup = message.meetup else { return }
+        switch action {
+        case .accept:
+            store.respondToMeetup(messageID: message.id, meetup: meetup, accept: true, in: conversationID)
+        case .decline, .cancel:
+            store.respondToMeetup(messageID: message.id, meetup: meetup, accept: false, in: conversationID)
+        case .counter:
+            counteringMessageID = message.id
+            showMeetupPicker = true
         }
     }
 
@@ -171,6 +202,8 @@ struct ChatView: View {
                         MessageBubble(
                             message: message,
                             isMine: message.senderID == me,
+                            proposerName: conversation.otherName(for: me),
+                            onMeetupAction: { handleMeetup($0, on: message) },
                             statusText: message.id == lastMineID ? status(of: message, in: conversation, other: other) : nil,
                             onTapImage: { fullScreenImage = ViewerImage(id: message.id, image: $0) },
                             onReport: {
@@ -208,6 +241,16 @@ struct ChatView: View {
                     .frame(width: 44, height: 44)
             }
             .accessibilityLabel("Send a photo")
+
+            Button {
+                counteringMessageID = nil
+                showMeetupPicker = true
+            } label: {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("Suggest a meet-up")
 
             TextField("Message", text: $draft, axis: .vertical)
                 .lineLimit(1...5)
@@ -368,44 +411,19 @@ private enum ChatImageCache {
 private struct MessageBubble: View {
     let message: ChatMessage
     let isMine: Bool
+    let proposerName: String
+    let onMeetupAction: (MeetupAction) -> Void
     let statusText: String?
     let onTapImage: (UIImage) -> Void
     let onReport: () -> Void
 
     var body: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 2) {
-            VStack(alignment: .leading, spacing: Spacing.xs) {
-                if let base64 = message.imageBase64, let image = ChatImageCache.image(id: message.id, base64: base64) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: 220, maxHeight: 260)
-                        .clipShape(RoundedRectangle(cornerRadius: Radius.medium))
-                        .onTapGesture { onTapImage(image) }
-                        .accessibilityLabel("Photo")
-                        .accessibilityAddTraits(.isButton)
-                }
-                if let text = message.text {
-                    Text(text)
-                        .foregroundStyle(isMine ? Color.pfSurfaceElevated : Color.pfTextPrimary)
-                }
-            }
-            .padding(Spacing.md)
-            .background(isMine ? Color.pfBrandPrimary : Color.pfSurface,
-                        in: RoundedRectangle(cornerRadius: Radius.large))
-            .overlay {
-                if !isMine {
-                    RoundedRectangle(cornerRadius: Radius.large).stroke(Color.pfBorder)
-                }
-            }
-            .opacity(message.isPending ? 0.7 : 1)
-            .contextMenu {
-                if let text = message.text {
-                    Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
-                }
-                if !isMine {
-                    Button("Report message", systemImage: "flag", action: onReport)
-                }
+            if let meetup = message.meetup {
+                MeetupCard(meetup: meetup, isMine: isMine, proposerName: proposerName, onAction: onMeetupAction)
+                    .opacity(message.isPending ? 0.7 : 1)
+            } else {
+                textBubble
             }
 
             HStack(spacing: Spacing.xs) {
@@ -416,8 +434,44 @@ private struct MessageBubble: View {
             .foregroundStyle(Color.pfTextSecondary)
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
-        .padding(isMine ? .leading : .trailing, 48)
-        .accessibilityElement(children: .combine)
+        .padding(isMine ? .leading : .trailing, message.meetup == nil ? 48 : 16)
+        .accessibilityElement(children: message.meetup == nil ? .combine : .contain)
+    }
+
+    private var textBubble: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            if let base64 = message.imageBase64, let image = ChatImageCache.image(id: message.id, base64: base64) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: 220, maxHeight: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.medium))
+                    .onTapGesture { onTapImage(image) }
+                    .accessibilityLabel("Photo")
+                    .accessibilityAddTraits(.isButton)
+            }
+            if let text = message.text {
+                Text(text)
+                    .foregroundStyle(isMine ? Color.pfSurfaceElevated : Color.pfTextPrimary)
+            }
+        }
+        .padding(Spacing.md)
+        .background(isMine ? Color.pfBrandPrimary : Color.pfSurface,
+                    in: RoundedRectangle(cornerRadius: Radius.large))
+        .overlay {
+            if !isMine {
+                RoundedRectangle(cornerRadius: Radius.large).stroke(Color.pfBorder)
+            }
+        }
+        .opacity(message.isPending ? 0.7 : 1)
+        .contextMenu {
+            if let text = message.text {
+                Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
+            }
+            if !isMine {
+                Button("Report message", systemImage: "flag", action: onReport)
+            }
+        }
     }
 }
 

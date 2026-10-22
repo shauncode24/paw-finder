@@ -224,7 +224,24 @@ The app always has something to show:
 - **Simulated shelter:** applications (Phase 9) and messages (Phase 10) always use the simulated shelter, so they work without any backend.
 - **Built in:** Care Hub content, breed guides, and checklists.
 
-## Later phases (15 onwards)
+## Phase 17: Meet & Greet Planner (MapKit)
+
+**Built:** place picker with search, shortcut chips and a centre pin; meet-up proposals as chat cards (accept, decline, suggest another, cancel); route, ETA and Look Around screen; reminders an hour before; upcoming meet-ups list; pet-photo map with clustering and a distance circle; nearby vets, pet stores, parks and groomers. Details in Listers-and-Messaging.md §15.
+
+| Left out / simplified | Why | How to add it later |
+|---|---|---|
+| Draggable pin you hold and move | A fixed centre pin is simpler and works the same | Use `MapReader` with a long-press gesture |
+| Transit route line on the map | MapKit only gives an estimate for transit | Open in Apple Maps |
+| Showing both people's live position | Needs location sharing and a server | Out of scope |
+| Reminder after the app is force-quit | Local notifications only; each phone schedules its own reminder while the app runs the chats listener | Needs push (Cloud Functions, paid plan) |
+| A separate "Cancelled" notification | Chat messages already notify | Add to `MessagesStore.notifyIfNew` |
+| Editing a proposal after sending | Use "Suggest another place or time" | Allow editing own proposals while `proposed` |
+| Pins for pets with no coordinates | Needs a location on the listing | The count shows as "N without a location" |
+| "Search this area" on the pet map | All active listings are already on the phone | Not needed |
+| Photo of the meeting place in the card | Look Around is on the route screen | `MKMapSnapshotter` image |
+| **Not compiled yet** | Written on Windows | Expect a small round of compile fixes (MapKit APIs: `LookAroundPreview`, `MapPolyline(route)`, `MKLookAroundSceneRequest`) |
+
+## Later phases (15 onwards, and 18-20)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 

@@ -39,6 +39,27 @@ struct CareHubView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
+                NavigationLink(value: Route.nearbyPlaces) {
+                    PFCard {
+                        HStack(spacing: Spacing.md) {
+                            Image(systemName: "cross.case.fill")
+                                .font(.title3)
+                                .foregroundStyle(Color.pfBrandPrimary)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Vets and pet shops near you")
+                                    .font(.pfHeadline)
+                                    .foregroundStyle(Color.pfTextPrimary)
+                                Text("Vets, pet stores, dog parks and groomers on a map")
+                                    .font(.pfCaption)
+                                    .foregroundStyle(Color.pfTextSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right").foregroundStyle(Color.pfTextSecondary)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+
                 section("Checklists") {
                     ForEach(CareContent.checklists) { checklist in
                         NavigationLink(value: Route.careChecklist(checklist.id)) {

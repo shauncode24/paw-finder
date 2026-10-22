@@ -403,6 +403,54 @@ Estimates assume ~10–15 hours/week. Each phase ends with a demoable build. **R
 - [ ] Review-compliance checklist (§11)
 - [ ] Portfolio packaging: README, architecture diagrams, demo video, ML model card, case study write-up
 
+### Added after the lister/real-chat refactor (Phases 17–20)
+
+These four phases were added once the app had two real personas (adopter, lister) on Firestore. Phase 17 is **built** (not compiled yet); 18-20 are **planned, not built**. They are listed in the order to build them. The same scope rules apply: Firebase free (Spark) plan only, no server, no tests, no Storage (photos stay inline in Firestore), new access rules go in `firestore.rules` (and need re-publishing), and docs are updated per phase (Leftover.md, CLAUDE.md, Listers-and-Messaging.md). Phase 6 (Core ML) is still deferred, on purpose.
+
+### Phase 17: Meet & Greet Planner (MapKit) (~1 week) **(built; not compiled yet. See Leftover.md)**
+The app's one full MapKit feature. Today's map (`ShelterMapView`) only shows lister pins; this phase makes it do real work for both personas.
+- [x] **Place picker** (lister, and adopter when counter-proposing): full-screen map with search-as-you-type (`MKLocalSearchCompleter`), a draggable pin, reverse geocoding for the address, and shortcut chips ("Dog parks", "Cafés", "Vets") through `MKLocalSearch`
+- [x] **Meet-up proposal in chat:** a special message type (`kind: "meetup"`: place name, address, lat/lon, proposed date and time, status `proposed/accepted/declined/changed`). Both sides see a card with a mini map; accept, decline, or propose another spot; the card updates live. Optional: copy the accepted meeting into the application's timeline
+- [x] **Route and ETA:** `MKDirections` with a polyline overlay, a driving / walking / transit picker, travel time and distance, and **Open in Apple Maps** (`MKMapItem.openMaps`) for turn-by-turn
+- [x] **Look Around** preview (`LookAroundPreview` / `MKLookAroundSceneRequest`) for the meeting spot where Apple has coverage; hidden when it doesn't
+- [x] **Discover map upgrade:** one pin per listing (pet-photo marker, not one pin per lister), **clustering** when zoomed out, a **radius circle** (`MapCircle`) matching the Discover distance filter, tap a pin for a callout that opens the pet
+- [x] **Nearby vets and pet stores** (`MKLocalSearch`, point-of-interest filter) on the Care Hub, and on the "Welcome home" screen after an adoption
+- [x] A reminder (local notification, no EventKit) for an accepted meet-up, one hour before
+- [x] Plumbing: `ChatMessage` gets optional `kind`/`meetup` fields (old messages unaffected); `firestore.rules` allows only the two participants to create or update meet-up messages; no new indexes; coordinates are stored as plain numbers
+- Out of scope: live location sharing, geofencing, offline map tiles
+
+### Phase 18: Lister Reviews (~0.5–1 week)
+- [ ] After an application reaches **adopted**, the adopter can rate the lister (1–5 stars) with an optional short note. One review per application, editable for 7 days
+- [ ] Reviews collection `reviews/{applicationID}` (listerID, reviewerID, reviewerName, rating, text, createdAt). Rules: only the adopter of an *adopted* application may create; anyone signed in can read; the lister can't edit or delete (they can report)
+- [ ] Lister profile and `ShelterCard` show the average rating and review count; a "Reviews" list screen with newest first
+- [ ] Aggregate kept on the lister's `users/{uid}` doc (`ratingSum`, `ratingCount`, updated in the same batch with `FieldValue.increment`) so lists never read every review
+- [ ] Lister can report an unfair review (reuses the existing `reports` collection)
+- [ ] Shown as a prompt on the "Welcome home" screen and from the application detail screen
+- Out of scope: lister replies to reviews, verified-purchase style checks, review photos
+
+### Phase 19: Adoption Journey (~1 week)
+What happens after "adopted". Gives both personas a reason to come back.
+- [ ] **Journey screen** (adopter) for an adopted pet: a timeline of Day 1 / Week 1 / Month 1 / Month 3 check-ins, each with a short checklist drawn from the existing Care Hub guides
+- [ ] **Post an update:** the adopter can post a photo and a short note to the journey (one photo each, compressed like chat photos, inline in Firestore: `journeys/{applicationID}/updates/{id}`)
+- [ ] **Lister sees the updates** on the application, and can choose to feature one on their profile ("Happy tails"); the adopter can switch sharing off
+- [ ] Local notifications for the next check-in date (reuses `NotificationManager.deliver`, adds a "journey" category and preference switch)
+- [ ] Journey progress shown on the Profile tab and on the adopted pet's card in My applications
+- [ ] Rules: only the adopter and that listing's lister can read a journey; only the adopter can write updates; "Happy tails" updates are readable by everyone signed in
+- Out of scope: vet-record uploads, return/re-homing flow, video updates
+
+### Phase 20: Foster Volunteers (~1–1.5 weeks)
+A third persona on the same login, alongside adopters and listers.
+- [ ] **Foster profile:** a "Become a foster" section in Profile (toggle `isFoster` on `users/{uid}`; fields: species and sizes you can take, how many animals, how long (days/weeks/open-ended), home type, other pets, experience, city and coordinates)
+- [ ] **Needs foster:** a lister can mark a listing as "Needs a foster" (new `fosterNeeded` flag, with a reason and duration). Shows as a badge on the pet card and detail screen and as a Discover filter
+- [ ] **Foster directory:** a list and a map layer (reuses Phase 17 map code) of volunteers near you, visible to listers only; fosters can hide themselves at any time
+- [ ] **Offer to foster:** a foster can message a lister about a "needs foster" listing (reuses chat) or send a short offer that the lister accepts or declines (small `fosterOffers/{id}` collection, with status updates and notifications)
+- [ ] When accepted, the listing shows "In foster care with <name>" (the foster's public name only, no address) until it is adopted
+- [ ] Rules: a foster's address is never public, only the city; lister-only directory reads; offers are readable by the two people involved
+- Out of scope: background checks, foster agreements and documents, supply or donation tracking, stipends
+
+### Phase dependencies and order
+Build **17 → 18 → 19 → 20**. 18 and 19 hang off the application reaching "adopted", which already exists. 20 reuses the map code from 17 and the chat from Phase 10. None of them need Phase 6, 8, or 12.
+
 ---
 
 ## 9. Release Tiers

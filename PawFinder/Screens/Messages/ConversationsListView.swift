@@ -22,6 +22,16 @@ struct ConversationsListView: View {
                 }
             } else {
                 List {
+                    if !store.upcomingMeetups.isEmpty {
+                        Section("Upcoming meet-ups") {
+                            ForEach(store.upcomingMeetups) { conversation in
+                                NavigationLink(value: Route.conversation(conversation.id)) {
+                                    UpcomingMeetupRow(conversation: conversation, me: store.userID ?? "")
+                                }
+                                .listRowBackground(Color.pfBrandDeep)
+                            }
+                        }
+                    }
                     ForEach(store.conversations) { conversation in
                         NavigationLink(value: Route.conversation(conversation.id)) {
                             ConversationRow(conversation: conversation, me: store.userID ?? "")
@@ -34,6 +44,36 @@ struct ConversationsListView: View {
         }
         .background(Color.pfBackground)
         .navigationTitle("Messages")
+    }
+}
+
+/// "Sat 14 Dec, 4:30 PM · Central Park · with Sunny Paws about Luna".
+private struct UpcomingMeetupRow: View {
+    let conversation: Conversation
+    let me: String
+
+    var body: some View {
+        HStack(spacing: Spacing.md) {
+            Image(systemName: "mappin.and.ellipse")
+                .font(.title3)
+                .foregroundStyle(Color.pfBrandPrimary)
+                .frame(width: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(conversation.nextMeetupPlace ?? "Meet-up")
+                    .font(.pfHeadline)
+                    .foregroundStyle(Color.pfTextPrimary)
+                if let date = conversation.nextMeetupAt {
+                    Text(date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute()))
+                        .font(.subheadline)
+                        .foregroundStyle(Color.pfTextPrimary)
+                }
+                Text("With \(conversation.otherName(for: me)) about \(conversation.listingName)")
+                    .font(.pfCaption)
+                    .foregroundStyle(Color.pfTextSecondary)
+            }
+        }
+        .padding(.vertical, Spacing.xs)
+        .accessibilityElement(children: .combine)
     }
 }
 

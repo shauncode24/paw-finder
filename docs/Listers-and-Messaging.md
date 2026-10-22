@@ -243,7 +243,7 @@ Firestore Spark plan (verify at https://firebase.google.com/pricing): 1 GiB stor
 
 ## 14. Known limitations
 
-- **Rules are "good enough", not hardened.** Either chat participant can edit any chat field, and `reports` can be written by anyone. Listings are public to everyone, including guests.
+- **Rules are "good enough", not hardened.** Either chat participant can edit any field of the chat document (meet-up message edits are limited to `meetup.status`), and `reports` can be written by anyone. Listings are public to everyone, including guests.
 - **No push when the app is closed** (see [7](#7-real-messaging-in-detail)); chat notifications depend on iOS's background refresh.
 - **Application attachments aren't uploaded** (privacy); listers can ask for documents in chat.
 - **Applications are matched to the adopter's phone by ID.** A new phone won't show old applications' drafts (the lister still has them).
@@ -252,3 +252,62 @@ Firestore Spark plan (verify at https://firebase.google.com/pricing): 1 GiB stor
 - **Listing `ownerName` is saved when you publish.** If a lister renames themselves, old listings keep the old name until edited (the lister profile page shows the new one).
 - **Deleting an account** removes the user's listings and public profile, but leaves chats and applications so the other person's history isn't broken.
 - **Not yet built or tested:** the project hasn't been compiled in Xcode since these changes were written. Expect a short round of compile fixes.
+
+---
+
+## 15. Meet & Greet planner (Phase 17, MapKit)
+
+The map is no longer decoration. A lister and an adopter can agree on a place and time to meet a pet, entirely inside the chat, and the app helps both of them get there.
+
+### What the user sees
+| Where | What |
+|---|---|
+| **Chat composer** | A 📍 button next to the photo button: **Suggest a meet-up**. |
+| **Place picker** | Search box with suggestions as you type, shortcut chips (Dog parks, Cafés, Vets, Pet stores), a pin in the middle of the map (move the map to move the pin, the address follows), a date and time, and **Send proposal**. |
+| **Chat card** | The proposal appears as a card with a mini map, place, address and time. The other person taps **Accept**, **Decline** or **Suggest another place or time** (which marks the old card "Changed" and sends a new one). Either person can **Cancel** an accepted one. |
+| **Route screen** (tap the card) | Map with the route line, **Drive / Walk / Transit** switch, travel time, distance, "Leave by 3:40 PM to arrive on time", a **Look Around** street-view preview (hidden where Apple has no imagery) and **Open in Apple Maps** for turn-by-turn. |
+| **Reminder** | One local notification an hour before an accepted meet-up, on both phones. |
+| **Messages screen** | An **Upcoming meet-ups** section on top. |
+| **Map tab › Pets** | One round photo pin per pet (not per lister), pins merge into numbered bubbles when zoomed out, a **distance circle** that matches the distance chip, species chips, and a card that opens the pet. Several pets at one address open a list instead of zooming forever. **Listers** is the old lister map. |
+| **Care Hub** and **Welcome home** | **Near you**: vets, pet stores, dog parks and groomers from Apple Maps, with call and directions. |
+
+### How it is built
+- **No new Firestore collections.** A proposal is a normal chat message with a `meetup` map instead of `text`: `placeName, address, latitude, longitude, date, status, proposedBy`. `status` is `proposed`, `accepted`, `declined` or `changed`.
+- **Accepting** updates the message's `meetup.status` and sets `nextMeetupAt` / `nextMeetupPlace` on the conversation document in one batch. Because each phone already listens to its conversations, both phones see the meet-up, show it in **Upcoming meet-ups**, and schedule the reminder (`MessagesStore.updateMeetupReminders`), even if the chat isn't open. Cancelling removes both fields and the reminder.
+- **MapKit pieces used:** `Map` with `Marker`/`Annotation`/`MapPolyline`/`MapCircle`, `MKLocalSearchCompleter` (suggestions), `MKLocalSearch` (shortcuts and nearby places), `CLGeocoder` (naming the pin), `MKDirections` (route and `calculateETA` for transit), `LookAroundPreview`, `MKMapItem.openInMaps`.
+- **Security rule added** (re-publish `firestore.rules`!): a participant may edit an existing meet-up message, but only its `meetup.status`. Text, sender and times can't be changed.
+
+### Files
+| New | Purpose |
+|---|---|
+| `Models/Meetup.swift` | `Meetup`, `MeetupStatus` |
+| `Services/PlaceSearch.swift` | `FoundPlace`, `PlaceSearch` (search, describe a pin, fit a region), `PlaceSearchCompleter` |
+| `Screens/Map/PlacePickerView.swift` | the picker |
+| `Screens/Map/MeetupMapView.swift` | route, ETA, Look Around |
+| `Screens/Map/PetsMapView.swift` | `MapHomeView` (Pets / Listers switch), `PetsMapView`, `PetCluster` |
+| `Screens/Map/NearbyPlacesView.swift` | vets, pet stores, parks, groomers |
+| `Screens/Messages/MeetupCard.swift` | the chat card |
+
+| Changed | What |
+|---|---|
+| `Models/Chat.swift` | `ChatMessage.meetup`, `Conversation.nextMeetupAt/Place` |
+| `Services/MessagesStore.swift` | `proposeMeetup`, `respondToMeetup`, `upcomingMeetups`, reminders |
+| `Services/NotificationManager.swift` | `scheduleMeetupReminder`, `cancelMeetupReminder` (uses the "Messages" switch) |
+| `Screens/Messages/ChatView.swift`, `ConversationsListView.swift` | 📍 button, card, picker sheet, upcoming section |
+| `App/Router.swift`, `Screens/PlaceholderScreens.swift` | routes `.meetupMap(Meetup)`, `.nearbyPlaces`; Map tab uses `MapHomeView` |
+| `Screens/CareHub/CareHubView.swift`, `Screens/Settings/InfoPages.swift` | "Near you" entry points |
+| `firestore.rules` | meet-up message update rule |
+
+### To try it
+1. Make sure the new `firestore.rules` is published (Firestore › Rules).
+2. Use two accounts as in section 10. On the adopter's phone open the chat, tap 📍, pick a park, choose a time, send.
+3. On the lister's phone accept it. Both phones now show it under **Messages › Upcoming meet-ups**; tap the card for the route. In the simulator set a location (Features › Location) or the route will say it needs location.
+4. Map tab › **Pets**: your listing appears as a photo pin if its location was found when it was published.
+
+### Limits
+- Needs location permission for routes and "Near you"; without it the spot is still shown.
+- Transit routes are an estimate only; Apple draws transit lines in the Maps app.
+- Look Around, routes and place search depend on Apple's coverage and aren't available everywhere.
+- Reminders need the notification permission and respect quiet hours (skipped if quiet hours would push it past the meet-up).
+- Pets show on the pet map only if the listing has coordinates (taken from the lister's profile or the listing's city/postcode when published).
+- Dates use the phone's time zone; two people in different zones see the same moment in their own time.

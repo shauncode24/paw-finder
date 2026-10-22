@@ -29,6 +29,8 @@ final class MessagesStore {
 
     @ObservationIgnored private var listener: ListenerRegistration?
     @ObservationIgnored private let notifiedKey = "lastNotifiedMessageTimes"
+    /// Meet-up reminders already scheduled on this phone (chat ID -> meet-up time).
+    @ObservationIgnored private var scheduledMeetups: [String: Date] = [:]
 
     private var isConfigured: Bool { FirebaseApp.app() != nil }
     private var db: Firestore { Firestore.firestore() }
@@ -43,6 +45,7 @@ final class MessagesStore {
         conversations = []
         isLoaded = false
         userID = uid
+        scheduledMeetups = [:]
 
         guard isConfigured, let uid else { return }
         listener = db.collection("conversations")
@@ -70,6 +73,34 @@ final class MessagesStore {
             .compactMap { Conversation(id: $0.documentID, data: $0.data(with: .estimate)) }
             .sorted { $0.lastMessageAt > $1.lastMessageAt }
         isLoaded = true
+        updateMeetupReminders()
+    }
+
+    /// The next accepted meet-up, soonest first, across all chats.
+    var upcomingMeetups: [Conversation] {
+        conversations
+            .filter { ($0.nextMeetupAt ?? .distantPast) > .now && !$0.isBlocked }
+            .sorted { ($0.nextMeetupAt ?? .distantFuture) < ($1.nextMeetupAt ?? .distantFuture) }
+    }
+
+    /// Keeps one reminder per accepted meet-up (an hour before), on both phones,
+    /// and removes it when the meet-up is cancelled.
+    private func updateMeetupReminders() {
+        let me = userID ?? ""
+        for chat in conversations {
+            guard let at = chat.nextMeetupAt, at > .now, !chat.isBlocked, scheduledMeetups[chat.id] != at else { continue }
+            scheduledMeetups[chat.id] = at
+            let place = chat.nextMeetupPlace ?? "the meeting spot"
+            let other = chat.otherName(for: me)
+            Task {
+                await NotificationManager.shared.scheduleMeetupReminder(
+                    conversationID: chat.id, place: place, petName: chat.listingName, with: other, at: at)
+            }
+        }
+        for id in Array(scheduledMeetups.keys) where conversation(id)?.nextMeetupAt == nil {
+            scheduledMeetups[id] = nil
+            NotificationManager.shared.cancelMeetupReminder(conversationID: id)
+        }
     }
 
     func conversation(_ id: String) -> Conversation? {
@@ -133,6 +164,65 @@ final class MessagesStore {
             "unread.\(other)": FieldValue.increment(Int64(1)),
             "typing.\(userID)": FieldValue.delete(),
         ], forDocument: conversationRef)
+        batch.commit(completion: nil)
+    }
+
+    // MARK: - Meet-ups
+
+    /// Sends a meet-up proposal. Pass `replacing` to answer someone else's
+    /// proposal with a different place or time (the old one becomes "changed").
+    func proposeMeetup(_ meetup: Meetup, replacing oldMessageID: String? = nil, in conversationID: String) {
+        guard let userID, let conversation = conversation(conversationID), !conversation.isBlocked else { return }
+        let conversationRef = db.collection("conversations").document(conversationID)
+        let messageRef = conversationRef.collection("messages").document()
+        let other = conversation.otherID(for: userID)
+
+        let batch = db.batch()
+        batch.setData(["senderID": userID, "createdAt": FieldValue.serverTimestamp(), "meetup": meetup.data],
+                      forDocument: messageRef)
+        if let oldMessageID {
+            batch.updateData(["meetup.status": MeetupStatus.changed.rawValue],
+                             forDocument: conversationRef.collection("messages").document(oldMessageID))
+        }
+        batch.updateData([
+            "lastMessage": "📍 Meet-up: \(meetup.summary)",
+            "lastMessageAt": FieldValue.serverTimestamp(),
+            "lastSenderID": userID,
+            "unread.\(other)": FieldValue.increment(Int64(1)),
+            "typing.\(userID)": FieldValue.delete(),
+        ], forDocument: conversationRef)
+        batch.commit(completion: nil)
+    }
+
+    /// Accepts or declines a proposal (or cancels one that was already accepted).
+    func respondToMeetup(messageID: String, meetup: Meetup, accept: Bool, in conversationID: String) {
+        guard let userID, let conversation = conversation(conversationID), !conversation.isBlocked else { return }
+        let conversationRef = db.collection("conversations").document(conversationID)
+        let messageRef = conversationRef.collection("messages").document(messageID)
+        let other = conversation.otherID(for: userID)
+
+        var update: [String: Any] = [
+            "lastMessageAt": FieldValue.serverTimestamp(),
+            "lastSenderID": userID,
+            "unread.\(other)": FieldValue.increment(Int64(1)),
+        ]
+        if accept {
+            update["lastMessage"] = "✅ Meet-up accepted: \(meetup.summary)"
+            update["nextMeetupAt"] = Timestamp(date: meetup.date)
+            update["nextMeetupPlace"] = meetup.placeName
+        } else {
+            let wasAccepted = meetup.status == .accepted
+            update["lastMessage"] = wasAccepted ? "Meet-up cancelled: \(meetup.placeName)" : "Meet-up declined: \(meetup.placeName)"
+            if wasAccepted {
+                update["nextMeetupAt"] = FieldValue.delete()
+                update["nextMeetupPlace"] = FieldValue.delete()
+            }
+        }
+
+        let batch = db.batch()
+        batch.updateData(["meetup.status": (accept ? MeetupStatus.accepted : MeetupStatus.declined).rawValue],
+                         forDocument: messageRef)
+        batch.updateData(update, forDocument: conversationRef)
         batch.commit(completion: nil)
     }
 

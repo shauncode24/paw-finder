@@ -53,6 +53,8 @@ enum Route: Hashable {
     case careArticle(String)
     case breedGuide(String)
     case careChecklist(String)
+    case meetupMap(Meetup)          // route, travel time and Look Around for an agreed meeting place
+    case nearbyPlaces               // vets, pet stores, dog parks near you
     case help
     case about
     case privacyPolicy

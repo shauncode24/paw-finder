@@ -27,6 +27,9 @@ struct Conversation: Identifiable, Hashable {
     var typing: [String: Date] = [:]
     var blockedBy: [String] = []
     var createdAt: Date = .now
+    /// An accepted meet-up that hasn't happened yet (set when someone accepts one).
+    var nextMeetupAt: Date?
+    var nextMeetupPlace: String?
 
     static func makeID(listingID: String, adopterID: String) -> String {
         "\(listingID)_\(adopterID)"
@@ -73,6 +76,8 @@ struct Conversation: Identifiable, Hashable {
         lastSenderID = (d["lastSenderID"] as? String) ?? ""
         blockedBy = (d["blockedBy"] as? [String]) ?? []
         createdAt = (d["createdAt"] as? Timestamp)?.dateValue() ?? .now
+        nextMeetupAt = (d["nextMeetupAt"] as? Timestamp)?.dateValue()
+        nextMeetupPlace = d["nextMeetupPlace"] as? String
         for (user, value) in (d["unread"] as? [String: Any]) ?? [:] {
             unread[user] = (value as? Int) ?? 0
         }
@@ -112,6 +117,8 @@ struct ChatMessage: Identifiable, Hashable {
     var text: String?
     /// The photo, as base64 text (decoded only when shown).
     var imageBase64: String?
+    /// Set when this message is a meet-up proposal rather than text.
+    var meetup: Meetup?
     /// When the server received it. For a message still being sent, an estimate.
     var createdAt: Date
     /// True while the message is still on this phone (offline or sending).
@@ -123,6 +130,7 @@ struct ChatMessage: Identifiable, Hashable {
         self.senderID = senderID
         text = d["text"] as? String
         imageBase64 = d["image"] as? String
+        meetup = (d["meetup"] as? [String: Any]).flatMap { Meetup(data: $0) }
         createdAt = (d["createdAt"] as? Timestamp)?.dateValue() ?? .now
         self.isPending = isPending
     }

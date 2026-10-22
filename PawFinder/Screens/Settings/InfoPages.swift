@@ -207,6 +207,7 @@ struct AdoptionCelebrationView: View {
     let pet: Pet
     @Environment(\.dismiss) private var dismiss
     @Environment(\.requestReview) private var requestReview
+    @Environment(Router.self) private var router
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dropped = false
 
@@ -236,6 +237,10 @@ struct AdoptionCelebrationView: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .foregroundStyle(Color.pfSurfaceElevated)
                         .background(Color.pfBrandPrimary, in: RoundedRectangle(cornerRadius: Radius.medium))
+                }
+                PFButton(title: "Find a vet nearby", style: .secondary) {
+                    dismiss()
+                    router.push(.nearbyPlaces)
                 }
                 PFButton(title: "Done", style: .secondary) {
                     dismiss()

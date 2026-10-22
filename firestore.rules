@@ -7,7 +7,7 @@
 //   listings/{id}            pet listings: anyone can read, only the lister can write
 //   listings/{id}/photos/*   the listing's photos (stored inside Firestore, no paid Storage plan needed)
 //   conversations/{id}       a chat: only the two people in it
-//   conversations/{id}/messages/*   its messages: only the two people in it
+//   conversations/{id}/messages/*   its messages (text, photos, meet-up proposals): only the two people in it
 //   applications/{id}        an application: the adopter and the lister it was sent to
 //   reports/{id}             reports of listings or chats: anyone can send, nobody can read them in the app
 
@@ -67,6 +67,13 @@ service cloud.firestore {
           && request.resource.data.senderID == request.auth.uid
           && request.auth.uid in getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
           && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.blockedBy.size() == 0;
+        // Meet-up proposals: either person can accept, decline or cancel by changing
+        // only the "status" inside the "meetup" field of a meet-up message.
+        allow update: if signedIn()
+          && resource.data.meetup != null
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['meetup'])
+          && request.resource.data.meetup.diff(resource.data.meetup).affectedKeys().hasOnly(['status']);
       }
     }
 

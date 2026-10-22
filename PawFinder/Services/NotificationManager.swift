@@ -161,6 +161,24 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                       extraInfo: ["conversationID": conversationID])
     }
 
+    /// "Meet Luna at Central Park in an hour." One per chat, an hour before the meet-up.
+    /// Skipped when that moment has passed or quiet hours would push it past the meet-up.
+    func scheduleMeetupReminder(conversationID: String, place: String, petName: String,
+                                with other: String, at meetupDate: Date) async {
+        let reminder = meetupDate.addingTimeInterval(-3600)
+        guard reminder > .now.addingTimeInterval(5),
+              NotificationPreferences.current.deliveryDate(for: reminder) < meetupDate else { return }
+        await deliver(.messages, id: "meetup-\(conversationID)",
+                      title: "Meet \(petName) in an hour",
+                      body: "\(place) with \(other), at \(meetupDate.formatted(date: .omitted, time: .shortened)).",
+                      link: "pawfinder://conversation/\(conversationID)", at: reminder,
+                      extraInfo: ["conversationID": conversationID])
+    }
+
+    func cancelMeetupReminder(conversationID: String) {
+        center.removePendingNotificationRequests(withIdentifiers: ["meetup-\(conversationID)"])
+    }
+
     /// From Settings, to check everything works. Ignores quiet hours.
     func sendTestNotification() async {
         guard await authorizationStatus() == .authorized else { return }
