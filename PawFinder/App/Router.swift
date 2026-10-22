@@ -37,7 +37,14 @@ enum Route: Hashable {
     case applicationForm(UUID)
     case applicationDetail(UUID)
     case messages
-    case conversation(UUID)
+    case conversation(String)       // conversation ID: "<listingID>_<adopterID>"
+    // Listing pets (the lister side)
+    case listerSetup
+    case myListings
+    case newListing
+    case editListing(String)
+    case receivedApplications
+    case receivedApplication(String)
     case savedSearches
     case notificationSettings
     case swipe(PetFilters)
@@ -63,6 +70,8 @@ final class Router {
     var pendingSavedSearchID: UUID?
     /// Filters for Discover to apply (from Siri, breed guides, links).
     var pendingFilters: PetFilters?
+    /// Set to true to show the sign-in sheet (for actions that need an account).
+    var showSignIn = false
 
     func push(_ route: Route) {
         paths[selectedTab, default: []].append(route)
@@ -98,7 +107,8 @@ final class Router {
     ///     pawfinder://pet/12345      a pet
     ///     pawfinder://shelter/NJ333  a shelter profile
     ///     pawfinder://application/<uuid>  an adoption application
-    ///     pawfinder://conversation/<uuid> a chat with a shelter
+    ///     pawfinder://conversation/<id>   a chat
+    ///     pawfinder://received/<id>       an application you received (as a lister)
     ///     pawfinder://search/<uuid>  run a saved search in Discover
     ///     pawfinder://discover?species=dog&q=luna   Discover with filters
     ///     pawfinder://messages       the chats list
@@ -122,8 +132,11 @@ final class Router {
             guard let argument, let id = UUID(uuidString: argument) else { return false }
             open(.applicationDetail(id), in: .profile)
         case "conversation":
-            guard let argument, let id = UUID(uuidString: argument) else { return false }
-            open(.conversation(id), in: .profile)
+            guard let argument else { return false }
+            open(.conversation(argument), in: .profile)
+        case "received":
+            guard let argument else { return false }
+            open(.receivedApplication(argument), in: .profile)
         case "search":
             guard let argument, let id = UUID(uuidString: argument) else { return false }
             selectedTab = .discover

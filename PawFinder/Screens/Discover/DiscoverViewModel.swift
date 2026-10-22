@@ -21,10 +21,6 @@ final class DiscoverViewModel {
     private(set) var isLoadingMore = false
     private(set) var loadMoreFailed = false
     private(set) var hasMore = false
-    /// Set when offline and showing saved results instead of fresh ones.
-    private(set) var cachedAt: Date?
-    /// True when showing the built-in sample pets (no keys, or Petfinder unreachable).
-    private(set) var isShowingSamples = false
 
     // Curated rails, shown when no search or filters are active.
     private(set) var newestPets: [Pet] = []
@@ -75,8 +71,6 @@ final class DiscoverViewModel {
             pets = page.pets
             currentPage = page.currentPage
             hasMore = page.hasMore
-            cachedAt = page.cachedAt
-            isShowingSamples = page.isSample
             loadMoreFailed = false
             loadedFilters = requested
             state = pets.isEmpty ? .empty : .loaded
@@ -85,6 +79,32 @@ final class DiscoverViewModel {
             guard !Task.isCancelled else { return }
             state = .error(error.localizedDescription)
         }
+    }
+
+    /// The live feed changed (someone listed, edited, or adopted out a pet): quietly
+    /// refresh what's on screen without jumping back to the top.
+    func feedChanged() async {
+        guard let requested = loadedFilters else { return }
+        switch state {
+        case .loaded, .empty: break
+        default: return
+        }
+        generation += 1
+        var all: [Pet] = []
+        var lastPage: PetPage?
+        for page in 1...max(currentPage, 1) {
+            guard let result = try? await repository.fetchPets(page: page, filters: requested) else { return }
+            all += result.pets
+            lastPage = result
+            if !result.hasMore { break }
+        }
+        guard !Task.isCancelled, let lastPage, requested == filters else { return }
+        pets = all
+        currentPage = lastPage.currentPage
+        hasMore = lastPage.hasMore
+        state = pets.isEmpty ? .empty : .loaded
+        railsLocation = nil
+        await loadRailsIfNeeded()
     }
 
     /// Loads the next page. Called when the last card appears.

@@ -26,7 +26,7 @@ struct DiscoverHeader: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.sm) {
                     quickAction("Swipe", icon: "rectangle.stack") { router.push(.swipe(filters)) }
-                    quickAction("Shelters near me", icon: "map") { router.selectedTab = .map }
+                    quickAction("Listers near me", icon: "map") { router.selectedTab = .map }
                     quickAction("Breed match", icon: "pawprint.circle") { router.selectedTab = .identify }
                     quickAction("Saved searches", icon: "bookmark") { router.push(.savedSearches) }
                     quickAction("Care Hub", icon: "book") { router.open(.careHub, in: .profile) }

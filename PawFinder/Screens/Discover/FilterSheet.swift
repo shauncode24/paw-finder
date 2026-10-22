@@ -70,7 +70,7 @@ struct FilterSheet: View {
 
                     section("Location") {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
-                            TextField("ZIP code or City, ST", text: locationText)
+                            TextField("Postcode or city", text: locationText)
                                 .textInputAutocapitalization(.words)
                                 .autocorrectionDisabled()
                                 .padding(Spacing.md)
@@ -161,7 +161,7 @@ struct FilterSheet: View {
         defer { isLocating = false }
         do {
             let location = try await locationService.requestLocation()
-            draft.location = location.petfinderQuery
+            draft.location = location.coordinateText
             draft.locationName = "Current location"
         } catch {
             locationError = error.localizedDescription

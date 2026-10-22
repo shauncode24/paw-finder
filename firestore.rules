@@ -1,0 +1,94 @@
+// PawFinder Firestore security rules.
+// Paste this whole file into: Firebase console > Build > Firestore Database > Rules > Publish.
+// (See docs/Listers-and-Messaging.md for what each rule is for.)
+//
+// Summary:
+//   users/{uid}              lister profiles: anyone can read, only the owner can write
+//   listings/{id}            pet listings: anyone can read, only the lister can write
+//   listings/{id}/photos/*   the listing's photos (stored inside Firestore, no paid Storage plan needed)
+//   conversations/{id}       a chat: only the two people in it
+//   conversations/{id}/messages/*   its messages: only the two people in it
+//   applications/{id}        an application: the adopter and the lister it was sent to
+//   reports/{id}             reports of listings or chats: anyone can send, nobody can read them in the app
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // ---- Lister profiles ----------------------------------------------------
+    match /users/{uid} {
+      allow read: if true;
+      allow create, update, delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ---- Listings -----------------------------------------------------------
+    match /listings/{listingId} {
+      allow read: if true;
+      allow create: if signedIn() && request.resource.data.ownerID == request.auth.uid;
+      allow update: if signedIn()
+                    && resource.data.ownerID == request.auth.uid
+                    && request.resource.data.ownerID == request.auth.uid;
+      allow delete: if signedIn() && resource.data.ownerID == request.auth.uid;
+
+      match /photos/{photoId} {
+        allow read: if true;
+        // getAfter(): a new listing and its photos are written in one batch,
+        // so the listing doesn't exist yet when the photo rule runs.
+        allow create, update: if signedIn()
+          && getAfter(/databases/$(database)/documents/listings/$(listingId)).data.ownerID == request.auth.uid;
+        allow delete: if signedIn()
+          && get(/databases/$(database)/documents/listings/$(listingId)).data.ownerID == request.auth.uid;
+      }
+    }
+
+    // ---- Chats ----------------------------------------------------------------
+    match /conversations/{conversationId} {
+      // "resource == null" lets the app check whether a chat exists before creating it.
+      allow read: if signedIn()
+                  && (resource == null || request.auth.uid in resource.data.participants);
+      allow create: if signedIn()
+                    && request.auth.uid in request.resource.data.participants
+                    && request.resource.data.participants.size() == 2
+                    && conversationId == request.resource.data.listingID + '_' + request.resource.data.adopterID;
+      allow update: if signedIn()
+                    && request.auth.uid in resource.data.participants
+                    && request.resource.data.participants == resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participants;
+        // Sent in the same batch that updates the chat's "last message", hence getAfter().
+        // Nobody can send while the chat is blocked.
+        allow create: if signedIn()
+          && request.resource.data.senderID == request.auth.uid
+          && request.auth.uid in getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.participants
+          && getAfter(/databases/$(database)/documents/conversations/$(conversationId)).data.blockedBy.size() == 0;
+      }
+    }
+
+    // ---- Applications -----------------------------------------------------------
+    match /applications/{applicationId} {
+      allow read: if signedIn()
+                  && (resource.data.adopterID == request.auth.uid || resource.data.listerID == request.auth.uid);
+      allow create: if signedIn()
+                    && request.resource.data.adopterID == request.auth.uid
+                    && request.resource.data.status == 'Submitted';
+      // The lister moves it along; the adopter can only withdraw it or mark it adopted.
+      allow update: if signedIn()
+                    && request.resource.data.adopterID == resource.data.adopterID
+                    && request.resource.data.listerID == resource.data.listerID
+                    && (resource.data.listerID == request.auth.uid
+                        || (resource.data.adopterID == request.auth.uid
+                            && request.resource.data.status in ['Withdrawn', 'Adopted']));
+    }
+
+    // ---- Reports ------------------------------------------------------------------
+    match /reports/{reportId} {
+      allow create: if true;
+    }
+  }
+}

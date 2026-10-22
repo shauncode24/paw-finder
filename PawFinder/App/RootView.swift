@@ -4,6 +4,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(MessagesStore.self) private var messages
+    @Environment(ApplicationsStore.self) private var applications
 
     var body: some View {
         @Bindable var router = router
@@ -18,9 +19,13 @@ struct RootView: View {
                 }
                 .tabItem { Label(tab.title, systemImage: tab.icon) }
                 .tag(tab)
-                // Unread messages live under Profile.
-                .badge(tab == .profile ? messages.unreadCount : 0)
+                // Unread messages and new applications live under Profile.
+                .badge(tab == .profile ? profileBadge : 0)
             }
+        }
+        // Actions that need an account (apply, message, list a pet) ask people to sign in here.
+        .sheet(isPresented: $router.showSignIn) {
+            AuthSheet()
         }
         // Our "turn on notifications?" explanation, before the system prompt.
         .sheet(isPresented: Binding(
@@ -32,6 +37,10 @@ struct RootView: View {
                     .presentationDetents([.large])
             }
         }
+    }
+
+    private var profileBadge: Int {
+        messages.unreadCount + applications.newReceivedCount
     }
 }
 

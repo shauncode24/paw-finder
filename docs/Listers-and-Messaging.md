@@ -1,0 +1,254 @@
+# Listers, Listings & Real Messaging
+
+This document covers the change that turned PawFinder from "an app that reads a pet API" into "a two-sided marketplace": **adopters** browse and apply, and **listers** (a person or a rescue) post the pets. It explains **what changed**, **how it works**, **how to set it up**, and **how to extend it**.
+
+- [1. The change in one page](#1-the-change-in-one-page)
+- [2. The two personas](#2-the-two-personas)
+- [3. Architecture](#3-architecture)
+- [4. Data model (Firestore)](#4-data-model-firestore)
+- [5. Security rules](#5-security-rules)
+- [6. Listings in detail](#6-listings-in-detail)
+- [7. Real messaging in detail](#7-real-messaging-in-detail)
+- [8. Applications in detail](#8-applications-in-detail)
+- [9. Setup, step by step](#9-setup-step-by-step)
+- [10. Testing it with two accounts](#10-testing-it-with-two-accounts)
+- [11. Free-plan math and limits](#11-free-plan-math-and-limits)
+- [12. Files: added, changed, removed](#12-files-added-changed-removed)
+- [13. How to extend it](#13-how-to-extend-it)
+- [14. Known limitations](#14-known-limitations)
+
+---
+
+## 1. The change in one page
+
+| Before | After |
+|---|---|
+| Pets came from the **Petfinder API** (needed an API key, US/Canada only, read-only) | Pets are **listings posted by PawFinder users**, shared live through **Firebase Firestore** |
+| Placeholder/sample pets filled in when the API wasn't reachable | The listings **are** the data. No placeholder pets at runtime. An empty app says "No pets listed yet" and offers "List a pet" |
+| One kind of user: the adopter | Two roles on **the same account**: adopter and **lister** (no separate login) |
+| Chat with a **simulated shelter** that sent canned replies from the phone | **Real user-to-user chat** between adopter and lister, live, with "Sent/Read" and "typing…" |
+| Applications were answered by a **simulated shelter** | Applications go to the **lister**, who reviews them in an inbox; the adopter sees status changes live |
+| `Secrets.plist` with API keys | **Removed.** The only config file is `GoogleService-Info.plist` |
+| No cloud except sign-in | Firestore stores listings, profiles, chats, applications, and reports. Still **no server to run** and **no paid plan** |
+
+Nothing is "simulated" any more except a small preview-only sample used by SwiftUI previews (`MockPetRepository`, never used when the app runs).
+
+## 2. The two personas
+
+It's **one account with two hats**, not two logins.
+
+| | Adopter | Lister |
+|---|---|---|
+| Who | Someone looking for a pet | A person rehoming a pet, or a rescue/shelter |
+| Becomes one by | Doing nothing (default) | Profile › **List a pet for adoption** → a one-minute lister profile (first time only) |
+| Can | Browse, search, favorite, swipe, compare, apply, message | Everything an adopter can, plus: create/edit/delete listings, mark pets pending/adopted, review applications, chat with applicants |
+| Needs sign-in? | Browsing and favoriting: **no**. Messaging, applying, listing: **yes** | Yes |
+| Sees under Profile | My applications, Messages | **My listings**, **Applications received**, **Lister profile**, plus the adopter items |
+
+A lister is simply an account whose `users/{uid}` document has `isLister = true`. You can be both at once: list your foster dog while applying for a cat.
+
+## 3. Architecture
+
+```
+ Adopter's iPhone                          Firebase (free Spark plan)                 Lister's iPhone
+ ┌───────────────────┐                     ┌───────────────────────────┐              ┌───────────────────┐
+ │ Discover          │◀── live listener ───│ listings/{id}             │◀── publish ──│ Listing form      │
+ │ Pet detail        │                     │ listings/{id}/photos/{n}  │              │ My listings       │
+ │ Chat              │◀─ live listener ───▶│ conversations/{id}        │◀─ listener ─▶│ Chat              │
+ │ Apply / tracker   │──── submit ────────▶│ conversations/{id}/messages│              │ Applications in   │
+ │                   │◀─ status updates ───│ applications/{id}         │◀─ decisions ─│ box               │
+ └───────────────────┘                     │ users/{uid}  (lister info) │              └───────────────────┘
+        │  Firebase Auth (email / username / Apple)                       │
+        └────────────────────────────────────────────────────────────────┘
+```
+
+Key ideas:
+
+1. **One live feed for listings.** `ListingsService` opens a single Firestore *snapshot listener* on active listings. Every phone gets the full set once, then only changes. **Searching, filtering, sorting and distance happen on the phone.** This keeps reads low on the free plan and means Firestore needs **no composite indexes**.
+2. **The repository pattern stayed.** Screens still talk to `PetRepository`. Only the implementation changed: `FirestoreListingsRepository` replaced the Petfinder one. That's why Discover, Swipe, Compare, saved searches, followed listers and favorites needed few changes.
+3. **Photos live inside Firestore.** No Firebase Storage (which now needs a paid plan). Each listing keeps a ~10 KB base64 thumbnail in its document and up to five ~100 KB photos in a `photos` sub-collection. A `pfphoto:` URL scheme lets existing views keep using `URL`s (see [6](#6-listings-in-detail)).
+4. **Offline for free.** Firestore keeps a local copy on the phone. Browsing works offline, and writes made offline (like chat messages) are queued and sent when the connection returns.
+
+## 4. Data model (Firestore)
+
+All field names are exact (see `Models/Listing.swift`, `Models/ListerProfile.swift`, `Models/Chat.swift`, `Models/ReceivedApplication.swift`).
+
+### `users/{uid}`: lister profile (public)
+`displayName`, `isOrganization`, `organization`, `bio`, `city`, `state`, `postcode`, `latitude`, `longitude` (approximate, from the postcode), `contactEmail`, `contactPhone`, `website`, `adoptionPolicy`, `avatar` (base64 JPEG, ~160 px), `isLister`, `createdAt`, `updatedAt`.
+Only listers have this document. No street address is collected.
+
+### `listings/{listingId}`: one pet
+| Group | Fields |
+|---|---|
+| Owner | `ownerID`, `ownerName` |
+| Basics | `name`, `species` (Dog/Cat/Rabbit/Bird), `breed`, `secondaryBreed`, `mixed` |
+| About | `age` (Baby/Young/Adult/Senior), `ageDetail`, `gender`, `size`, `colors`, `coat`, `weight`, `temperament` (array) |
+| Getting along | `goodWithKids`, `goodWithDogs`, `goodWithCats` (**omitted = "not sure"**), `houseTrained` |
+| Health | `vaccinated`, `spayedNeutered`, `microchipped`, `specialNeeds`, `specialNeedsNotes`, `healthNotes` |
+| Adoption | `adoptionFee` (number, 0 = free), `description`, `videoLink`, `status` (`available`/`pending`/`adopted`), `isActive` (`status != adopted`) |
+| Where | `city`, `state`, `postcode`, `latitude`, `longitude` |
+| Contact | `contactEmail`, `contactPhone` (optional) |
+| Media | `photoCount`, `thumbnail` (base64 JPEG ~280 px) |
+| Times | `createdAt` (Timestamp), `updatedAt` (server time) |
+
+`listings/{id}/photos/{0…4}`: `{ data: <base64 JPEG ≤ 900 px>, order: Int }`.
+
+### `conversations/{listingID}_{adopterID}`: one chat per adopter per pet
+`listingID`, `listingName`, `listingSpecies`, `adopterID`, `adopterName`, `listerID`, `listerName`, `participants` (array of the two user IDs), `lastMessage`, `lastMessageAt`, `lastSenderID`, `unread` (map uid → count), `lastRead` (map uid → time), `typing` (map uid → time), `blockedBy` (array), `createdAt`.
+The ID format means "does a chat already exist?" is a single lookup, with no search.
+
+`conversations/{id}/messages/{messageId}`: `senderID`, `text` (optional), `image` (optional base64 JPEG ≤ 800 px), `createdAt` (server time).
+
+### `applications/{applicationId}` (the ID is the adopter's local UUID)
+`adopterID`, `adopterName`, `listerID`, `listingID`, `petName`, `petSpecies`, `status` (`Submitted`, `In review`, `Interview`, `Approved`, `Declined`, `Adopted`, `Withdrawn`), `formJSON` (the whole form as JSON text), `events` (array of JSON text, one per status change), `submittedAt`, `updatedAt`.
+
+### `reports/{id}`
+`type` (`listing`/`conversation`), the item's ID, `reason`, optional `details`, optional `reporterID`, `createdAt`. Write-only from the app: read them in the Firebase console.
+
+## 5. Security rules
+
+The rules live in **`firestore.rules`** at the repo root. Publish them in the Firebase console (see [9](#9-setup-step-by-step)). In plain English:
+
+| Collection | Read | Write |
+|---|---|---|
+| `users` | anyone (listers are public) | only the owner |
+| `listings` and `photos` | anyone (so guests can browse) | only the lister who owns it |
+| `conversations` | only its two participants | participants only; a chat's two participants can't be changed |
+| `messages` | only the two participants | only a participant, as themselves, and **not while the chat is blocked** |
+| `applications` | the adopter and the lister it was sent to | the adopter creates it; the **lister** changes its status; the adopter can only withdraw it or mark it adopted |
+| `reports` | nobody (console only) | anyone |
+
+Two details worth knowing:
+- Photos and messages are written in the **same batch** as their parent (listing / conversation update). Rules then use `getAfter()` (the state *after* the batch) instead of `get()`, otherwise a brand-new listing's photos would be rejected.
+- The rule `resource == null || …` on conversations lets the app ask "does this chat exist yet?" before creating it.
+
+These rules are good for a class project and a real demo, but see [14](#14-known-limitations) for what a production app would tighten.
+
+## 6. Listings in detail
+
+**Creating a listing** (`Screens/Lister/ListingFormView.swift`) is one scrolling form:
+photos (up to 5, first = cover, long-press to reorder/remove) → basics (name, species, breed with suggestions from `BreedCatalog`, mixed breed) → about them (age group + exact age, gender, size, coat, colors, weight, temperament chips) → getting along (kids/dogs/cats, house-trained) → health (vaccinated, spayed/neutered, microchipped, special needs, notes) → adoption (fee, story, video link) → location & optional contact → (when editing) status.
+`ListingDraft.problems` lists what's missing, shown if you tap Publish too early.
+
+**Publishing** (`ListingsService.publish`):
+1. Photos are already shrunk to ≤ 900 px when picked (`ImageCompressor`).
+2. A 280 px thumbnail is made from the cover photo.
+3. The city/postcode is geocoded to an approximate latitude/longitude.
+4. One **batch write** saves the listing and its photos together, and removes photos that were deleted while editing.
+5. Firestore's latency compensation shows it in your own feed immediately; other phones get it within a second or two.
+
+**Showing listings**
+- `ListingsService` keeps `listings` (everything active, newest first) up to date.
+- `PetFilters.matches(_:)` (in `Models/Listing.swift`) applies every filter on the phone. Location filtering geocodes what you typed (or uses GPS) and measures distance to each listing's coordinates.
+- `DiscoverView` listens to `ListingsService.revision`: when anyone posts or edits, it quietly refreshes in place (`DiscoverViewModel.feedChanged`) without jumping to the top.
+
+**Photos without Storage:** the app stores photos in Firestore, but views just use `URL`s. Listing photos use a private scheme: `pfphoto:///thumb/<id>`, `pfphoto:///photo/<id>/<n>`, `pfphoto:///avatar/<uid>`. `RemoteImage` (like `AsyncImage`) hands those to `PhotoLoader`, which pulls the thumbnail from the live feed, or reads the photo document, and caches it in memory.
+
+**Statuses:** `available` → `pending` (set automatically when you approve an application) → `adopted` (removes it from Discover). Anyone who favorited the pet is notified of changes by the background check (`FavoritesStore.refreshStatuses`).
+
+## 7. Real messaging in detail
+
+You asked for "polling or socket". PawFinder uses a **socket-style live connection** with no polling:
+
+> A Firestore **snapshot listener** keeps one long-lived connection open to Firebase (gRPC/WebChannel under the hood). When a message document is created on one phone, the server pushes it down that connection to the other phone. That is exactly the behaviour of a WebSocket chat, and you write no socket code.
+
+**How a message travels** (`Services/MessagesStore.swift`, `Screens/Messages/*`):
+1. Sender taps Send → `MessagesStore.send` writes **one batch**: the message document, plus an update of the conversation (`lastMessage`, `lastMessageAt`, `lastSenderID`, and `unread.<otherUser> += 1`).
+2. The write is **not awaited**. Firestore shows it instantly (marked *pending*, "Sending…"), and sends it when it can. Offline, it shows "Waiting to send" and goes out on reconnect (this is the **outbox**, built into Firestore).
+3. The recipient's listeners fire: the **conversation list** updates its preview and unread badge, and an **open chat** appends the message.
+4. When the recipient has the chat open, `markRead` sets `unread.<me> = 0` and `lastRead.<me> = now`. The sender compares that to each message's time and shows **Read**.
+5. **Typing:** while the text field changes, the app writes `typing.<me> = now` (at most every ~2.5 s; cleared after a 4 s pause or on send). The other phone shows "… is typing" if that time is under 8 s old.
+6. **Photos:** shrunk to ≤ 800 px and stored in the message document (`image`).
+
+**Safety:** `ContentModerator` (unchanged) blocks a few abusive words and warns about payment/scam phrases before sending. Anyone can **report** a chat or a single message (saved in `reports`) and **block** a chat (`blockedBy`; the rules then refuse new messages from either side until unblocked).
+
+**Notifications for chat** (no server, so no remote push):
+- App open, chat not on screen: a local notification appears the moment the listener sees the new message.
+- App closed: iOS runs `BackgroundRefresh` now and then; `MessagesStore.backgroundCheck()` fetches your chats once and notifies about anything new. Timing is up to iOS (typically minutes to hours).
+- Instant delivery to a closed app needs **push notifications**, which need a small server (a Firebase Cloud Function) and a paid Apple Developer account. See [13](#13-how-to-extend-it).
+
+**If you ever want real polling or your own WebSocket server instead:** the screens only call `MessagesStore` (`send`, `markRead`, `setTyping`, `openConversation`, …). Replace its internals with REST polling (`GET /conversations/{id}/messages?after=<time>` every few seconds) or a `URLSessionWebSocketTask`, and keep the same published properties (`conversations`, `unreadCount`) and `ChatViewModel.messages`. No view needs to change.
+
+## 8. Applications in detail
+
+- The adopter fills in the multi-step form on their phone (drafts autosave locally). Attached photos (ID, lease, …) **stay on the adopter's phone**; they're not uploaded.
+- **Submit** writes `applications/{id}` (waits for the server, so a failure is reported: "You're offline", etc.). One application per adopter per pet.
+- The **lister** sees it under Profile › **Applications received** (a live list, with a notification and a tab badge for new ones) and can: *Start reviewing* → *Invite for a chat or meeting* → *Approve* / *Decline* → *Mark as adopted*, adding an optional note each time. **Approve** sets the listing to *pending*; **Mark as adopted** sets it to *adopted*.
+- The **adopter's** copy updates live (status, timeline, the lister's notes), with a notification per decision and the "Bring them home" checklist after approval.
+- Either side can **message** the other from the application screens.
+
+## 9. Setup, step by step
+
+Full instructions are in [SETUP.md](SETUP.md). The short version:
+
+1. **Firebase project + iOS app + `GoogleService-Info.plist`** into `PawFinder/` (the bundle ID must match Xcode's).
+2. **Authentication › Sign-in method › Email/Password → Enable.**
+3. **Firestore Database › Create database** (Standard edition, any region, *production mode*).
+4. **Rules tab → paste all of `firestore.rules` → Publish.**
+5. Run the app. If Discover says "Not connected yet", the plist is missing or not in the app target. If it says it can't read listings, the rules weren't published.
+
+No API keys, no server, no billing.
+
+## 10. Testing it with two accounts
+
+You need two sign-ins. Two simulators work; a phone plus a simulator is best.
+
+| Step | Device A (lister) | Device B (adopter) |
+|---|---|---|
+| 1 | Sign up. Profile › **List a pet for adoption** → fill the lister profile → **Continue** | Sign up with another email |
+| 2 | Add photos, details, **Publish** | Discover: the pet appears within seconds (try pulling to refresh if not) |
+| 3 | | Open the pet › **Message Sam** (the lister's name). Send "Hello!" |
+| 4 | Profile › **Messages**: unread badge. Open it; reply | Watch **Read** appear, then "typing…" while A types |
+| 5 | | **Apply to adopt**, submit |
+| 6 | Profile › **Applications received** (a "new" badge). **Start reviewing** → **Approve** | My applications: status and notes update live; the pet shows "Adoption pending" |
+| 7 | **Mark as adopted** | The pet leaves Discover; B can tap "We brought … home!" |
+| 8 | Turn on airplane mode, send a message | It shows "Waiting to send"; turn airplane mode off and it delivers |
+
+## 11. Free-plan math and limits
+
+Firestore Spark plan (verify at https://firebase.google.com/pricing): 1 GiB stored, 50,000 reads and 20,000 writes per day.
+
+- **Browsing:** the live feed downloads each active listing **once** (thumbnail included, ~10–15 KB) and then only changes. 500 listings ≈ 5–8 MB on first launch, then nearly free. Full-size photos are read only when you open a pet (≈ 5 reads).
+- **Chat:** one message ≈ 2 writes + a few reads. A busy demo day stays far below the limits.
+- **Storage:** a listing with 5 photos ≈ 0.5–0.7 MB. 1 GiB ≈ 1,500+ listings.
+- **Caps in the app:** 5 photos per listing; the feed loads the newest **500** active listings (`ListingsService.startFeed`); 40 messages per chat page ("Load earlier messages").
+- If you hit a quota, Firebase pauses access until the daily reset. The app shows "Too many requests".
+
+## 12. Files: added, changed, removed
+
+**Removed** (the Petfinder API and everything around it): `PetfinderClient`, `PetfinderModels`, `FallbackPetRepository`, `PetCache`, `Secrets.swift`, `Secrets.plist`, `Secrets.example.plist`, `PetVideoView`, the old local `Conversation` model, the simulated shelter replies (in `MessagesStore` and `ApplicationsStore`).
+
+**Added**
+- Data: `Models/Listing.swift` (draft, status, mapper, filter matching), `Models/ListerProfile.swift`, `Models/BreedCatalog.swift`, `Models/Chat.swift`, `Models/ReceivedApplication.swift`.
+- Services: `ListingsService`, `FirestoreListingsRepository` (inside `PetRepository.swift`), `ListerProfileStore` (+ `ListerDirectory`), `PhotoLoader` (+ `RemoteImage`, `ImageCompressor`), `MessagesStore` (rewritten), `MessagesStore+Opening`.
+- Screens: `Screens/Lister/` (`ListerSetupView`, `ListingFormView`, `MyListingsView`, `ReceivedApplicationsView`), `Screens/Messages/ChatViewModel`.
+- Config: `firestore.rules`.
+
+**Rewritten:** `ChatView`, `ConversationsListView`, `ApplicationsStore`, `NotificationManager` (message/application notifications), `ShelterGeocoder`, `MockPetRepository` (now preview-only).
+
+**Changed:** `Pet` (new optional fields), `Shelter` (now a lister's public profile), `PetFilters` (Petfinder request code removed), `PetDetailView` (fee/health/"Listed by", real message button, owner controls), `DiscoverView/ViewModel` (live refresh, empty state), `ProfileView` (lister section), `RootView` (sign-in sheet), `Router` (new routes), `PawFinderApp`, settings/help/privacy text, and the Xcode project (adds the `FirebaseFirestore` package product).
+
+## 13. How to extend it
+
+| Goal | How |
+|---|---|
+| **Add a field to listings** (e.g. "energy level") | 1) add it to `ListingDraft`; 2) read/write it in `ListingMapper.draft/data/pet`; 3) add a `Pet` property (optional, with a default); 4) add a control in `ListingFormView`; 5) show it in `PetDetailView`; 6) (optional) filter on it in `PetFilters` + `PetFilters.matches`. No Firestore change is needed |
+| **Instant push for chat/applications** | Needs a paid Apple Developer account (APNs key) and Firebase **Cloud Functions** (Blaze plan). Add an `onCreate` function for `conversations/{id}/messages/{id}` that sends an FCM push to the other participant, and the same for `applications`. Store each device's FCM token in `users/{uid}`. The app side: add the `FirebaseMessaging` package and call `registerForRemoteNotifications` |
+| **Move photos to Firebase Storage** (smaller documents, faster) | Needs the Blaze plan. Upload JPEGs to `listings/{id}/{n}.jpg`, store the download URLs in the listing, and make `PhotoURL` return those `https` URLs. `RemoteImage` already handles normal URLs |
+| **Faster "near me" for thousands of listings** | Add a geohash field to listings and query by prefix (the `GeoFire`-style approach), then keep client-side filtering for the rest |
+| **A moderator tool** | Read `reports` in the console, or build a small admin view guarded by a custom claim (`request.auth.token.admin == true`) and add rules to read `reports` and delete any listing |
+| **Verified rescues** | Add `isVerified` to `users/{uid}`, set it from the console, show a badge in `ShelterCard`, and add a "Verified only" filter |
+| **Sync favorites across devices** | Add a `users/{uid}/favorites` sub-collection and mirror `FavoritesStore` into it (this is the "Phase 8" work from `SPEC.md`) |
+| **Your own server instead of Firebase** | Keep the same protocols: implement `PetRepository` over REST and replace `MessagesStore`'s internals with a WebSocket client. The screens don't change |
+
+## 14. Known limitations
+
+- **Rules are "good enough", not hardened.** Either chat participant can edit any chat field, and `reports` can be written by anyone. Listings are public to everyone, including guests.
+- **No push when the app is closed** (see [7](#7-real-messaging-in-detail)); chat notifications depend on iOS's background refresh.
+- **Application attachments aren't uploaded** (privacy); listers can ask for documents in chat.
+- **Applications are matched to the adopter's phone by ID.** A new phone won't show old applications' drafts (the lister still has them).
+- **Free-plan size limits:** 5 photos per listing; the feed loads the newest 500 active listings.
+- **Distances are in miles** and locations are geocoded with Apple's service (rate-limited; results are cached).
+- **Listing `ownerName` is saved when you publish.** If a lister renames themselves, old listings keep the old name until edited (the lister profile page shows the new one).
+- **Deleting an account** removes the user's listings and public profile, but leaves chats and applications so the other person's history isn't broken.
+- **Not yet built or tested:** the project hasn't been compiled in Xcode since these changes were written. Expect a short round of compile fixes.

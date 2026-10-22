@@ -60,6 +60,18 @@ struct RouteView: View {
             ConversationsListView()
         case .conversation(let id):
             ChatView(conversationID: id)
+        case .listerSetup:
+            ListerSetupView()
+        case .myListings:
+            MyListingsView()
+        case .newListing:
+            ListingFormView()
+        case .editListing(let id):
+            ListingFormView(editingID: id)
+        case .receivedApplications:
+            ReceivedApplicationsView()
+        case .receivedApplication(let id):
+            ReceivedApplicationDetailView(applicationID: id)
         case .savedSearches:
             SavedSearchesView()
         case .notificationSettings:

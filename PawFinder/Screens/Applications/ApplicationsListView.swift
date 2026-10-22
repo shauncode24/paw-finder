@@ -22,7 +22,6 @@ struct ApplicationsListView: View {
         }
         .background(Color.pfBackground)
         .navigationTitle("My applications")
-        .onAppear { store.refresh() }
     }
 
     @ViewBuilder

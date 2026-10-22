@@ -128,19 +128,23 @@ final class AuthManager {
 
     /// Deletes the account. Firebase wants a fresh sign-in first, so password
     /// accounts pass their password here.
-    func deleteAccount(password: String) async throws {
+    /// - Parameter beforeDelete: runs after the password check but before the account
+    ///   goes away (Firestore only accepts deletes while you're still signed in).
+    func deleteAccount(password: String, beforeDelete: () async -> Void = {}) async throws {
         guard let currentUser = firebaseUser,
               let email = currentUser.email else { throw AuthError.notConfigured }
         try await run {
             let credential = EmailAuthProvider.credential(withEmail: email, password: password)
             try await currentUser.reauthenticate(with: credential)
+            await beforeDelete()
             try await currentUser.delete()
         }
     }
 
     /// Apple accounts confirm with Apple again; we also revoke the Apple
     /// token, which App Store rules require when deleting an Apple account.
-    func deleteAppleAccount(_ result: Result<ASAuthorization, Error>, nonce: String) async throws {
+    func deleteAppleAccount(_ result: Result<ASAuthorization, Error>, nonce: String,
+                            beforeDelete: () async -> Void = {}) async throws {
         guard let currentUser = firebaseUser else { throw AuthError.notConfigured }
         let credential = try Self.appleCredential(from: result)
         guard let tokenData = credential.identityToken, let token = String(data: tokenData, encoding: .utf8),
@@ -151,6 +155,7 @@ final class AuthManager {
             let firebaseCredential = OAuthProvider.appleCredential(withIDToken: token, rawNonce: nonce,
                                                                    fullName: nil)
             try await currentUser.reauthenticate(with: firebaseCredential)
+            await beforeDelete()
             try await Auth.auth().revokeToken(withAuthorizationCode: code)
             try await currentUser.delete()
         }

@@ -2,6 +2,8 @@ import Foundation
 
 /// An application to adopt one pet: the form answers, documents, status
 /// history, and (once approved) the "bring them home" checklist.
+/// The adopter's copy lives on their phone; the lister gets the submitted
+/// version in Firestore (`applications/{id}`) and updates its status there.
 struct AdoptionApplication: Codable, Identifiable, Hashable {
     var id = UUID()
     var pet: Pet                         // snapshot, so it works offline
@@ -11,8 +13,6 @@ struct AdoptionApplication: Codable, Identifiable, Hashable {
     var submittedAt: Date?
     var status: ApplicationStatus = .draft
     var events: [ApplicationStatusEvent] = []
-    /// Shelter replies planned by the simulated shelter, applied when their time comes.
-    var scheduledEvents: [ApplicationStatusEvent] = []
     var form = ApplicationForm()
     var attachments: [ApplicationAttachment] = []
     var checklist: [ChecklistItem] = []

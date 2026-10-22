@@ -15,11 +15,11 @@ struct PetFilters: Codable, Hashable {
     var specialNeeds = false
     var coats: Set<Coat> = []
     var listed: Listed = .any
-    var location = ""                // US/Canada ZIP, "City, ST", or "lat,long"
+    var location = ""                // ZIP/postcode, "City, ST", or "lat,long"
     var locationName: String?        // shown instead of `location`, e.g. "Current location"
     var distance = 50                // miles, only used with a location
     var sort: Sort = .newest
-    var shelterID: String?           // only this shelter's pets (shelter profile)
+    var shelterID: String?           // only this lister's pets (lister profile)
 
     enum Species: String, Codable, CaseIterable {
         case dog = "Dog", cat = "Cat", rabbit = "Rabbit", bird = "Bird"
@@ -31,8 +31,6 @@ struct PetFilters: Codable, Hashable {
 
     enum Size: String, Codable, CaseIterable {
         case small = "Small", medium = "Medium", large = "Large", xlarge = "Extra Large"
-
-        var apiValue: String { self == .xlarge ? "xlarge" : rawValue.lowercased() }
     }
 
     enum Gender: String, Codable, CaseIterable {
@@ -43,7 +41,7 @@ struct PetFilters: Codable, Hashable {
         case short = "Short", medium = "Medium", long = "Long", wire = "Wire", hairless = "Hairless", curly = "Curly"
     }
 
-    /// How long the pet has been listed (Petfinder's `after` / `before` dates).
+    /// How long the pet has been listed.
     enum Listed: String, Codable, CaseIterable {
         case any = "Any time"
         case today = "New today"
@@ -70,15 +68,6 @@ struct PetFilters: Codable, Hashable {
         case longestWaiting = "Longest waiting"
         case nearest = "Nearest"
         case random = "Random"
-
-        var apiValue: String {
-            switch self {
-            case .newest: "recent"
-            case .longestWaiting: "-recent"
-            case .nearest: "distance"
-            case .random: "random"
-            }
-        }
     }
 
     /// What to show for the location, e.g. "Current location" or "Austin, TX".
@@ -115,47 +104,4 @@ struct PetFilters: Codable, Hashable {
         if !location.isEmpty { count += 1 }
         return count
     }
-
-    /// Petfinder query parameters (https://www.petfinder.com/developers/v2/docs/#get-animals).
-    var queryItems: [String: String] {
-        var query = ["sort": sort.apiValue]
-        let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        if !trimmedName.isEmpty { query["name"] = trimmedName }
-        if let species { query["type"] = species.rawValue }
-        if let breed { query["breed"] = breed }
-        if let shelterID { query["organization"] = shelterID }
-        if !ages.isEmpty { query["age"] = ages.map { $0.rawValue.lowercased() }.sorted().joined(separator: ",") }
-        if !sizes.isEmpty { query["size"] = sizes.map(\.apiValue).sorted().joined(separator: ",") }
-        if let gender { query["gender"] = gender.rawValue.lowercased() }
-        if goodWithKids { query["good_with_children"] = "true" }
-        if goodWithDogs { query["good_with_dogs"] = "true" }
-        if goodWithCats { query["good_with_cats"] = "true" }
-        if houseTrained { query["house_trained"] = "true" }
-        if specialNeeds { query["special_needs"] = "true" }
-        if !coats.isEmpty { query["coat"] = coats.map { $0.rawValue.lowercased() }.sorted().joined(separator: ",") }
-        if let dateFilter = listed.dateFilter {
-            // Rounded to the hour so the offline cache key stays the same for a while.
-            let hour = Calendar.current.dateInterval(of: .hour, for: dateFilter.date)?.start ?? dateFilter.date
-            query[dateFilter.key] = Self.apiDateFormatter.string(from: hour)
-        }
-
-        let trimmedLocation = location.trimmingCharacters(in: .whitespaces)
-        if trimmedLocation.isEmpty {
-            // "Nearest" needs a location; fall back to newest.
-            if sort == .nearest { query["sort"] = Sort.newest.apiValue }
-        } else {
-            query["location"] = trimmedLocation
-            query["distance"] = String(distance)
-        }
-        return query
-    }
-
-    /// Petfinder wants dates like "2026-10-07T19:00:00+00:00".
-    private static let apiDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssxxxxx"
-        return formatter
-    }()
 }

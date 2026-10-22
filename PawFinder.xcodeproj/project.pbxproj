@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		AA0000000000000000000012 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000011 /* FirebaseAuth */; };
+		AA0000000000000000000014 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000013 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA0000000000000000000012 /* FirebaseAuth in Frameworks */,
+				AA0000000000000000000014 /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = PawFinder;
 			packageProductDependencies = (
 				AA0000000000000000000011 /* FirebaseAuth */,
+				AA0000000000000000000013 /* FirebaseFirestore */,
 			);
 			productName = PawFinder;
 			productReference = AA0000000000000000000001 /* PawFinder.app */;
@@ -281,6 +284,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AA0000000000000000000010 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		AA0000000000000000000013 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000000000000000000010 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

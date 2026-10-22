@@ -8,6 +8,10 @@ struct DiscoverView: View {
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
     @Environment(SavedSearchesStore.self) private var savedSearches
     @Environment(Router.self) private var router
+    @Environment(AuthManager.self) private var auth
+    @Environment(ListerProfileStore.self) private var listerProfile
+    @Environment(ListingsService.self) private var listings
+    @Environment(NetworkMonitor.self) private var network
     @State private var showSaveSearch = false
     @State private var saveSearchName = ""
 
@@ -22,10 +26,8 @@ struct DiscoverView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.xl) {
-                if let cachedAt = viewModel.cachedAt {
-                    offlineBanner(cachedAt)
-                } else if viewModel.isShowingSamples {
-                    sampleBanner
+                if !network.isOnline {
+                    offlineBanner
                 }
 
                 if viewModel.filters.isBrowsing {
@@ -91,6 +93,10 @@ struct DiscoverView: View {
         }
         .refreshable { await viewModel.reload() }
         .task(id: viewModel.filters) { await viewModel.filtersChanged() }
+        // New listings (and adopted-out pets) arrive live; keep the screen current.
+        .onChange(of: listings.revision) {
+            Task { await viewModel.feedChanged() }
+        }
         .task(id: viewModel.filters.species) { await viewModel.loadBreeds() }
         .task(id: viewModel.filters.location) { await viewModel.loadRailsIfNeeded() }
         // Run a saved search picked from the list or a notification.
@@ -165,15 +171,29 @@ struct DiscoverView: View {
                 }
             }
         case .empty:
-            EmptyStateView(icon: "magnifyingglass", title: "No matches",
-                           message: "Try removing some filters.",
-                           buttonTitle: "Clear filters") { viewModel.clearFilters() }
-                .frame(minHeight: 300)
-        case .error(let message):
-            ErrorView(message: message) {
-                Task { await viewModel.reload(showSkeleton: true) }
+            if viewModel.filters.isDefault {
+                // Nobody has listed a pet yet.
+                EmptyStateView(icon: "pawprint", title: "No pets listed yet",
+                               message: "Pets that people list for adoption show up here as soon as they're posted. Know a pet who needs a home?",
+                               buttonTitle: "List a pet") { startListing() }
+                    .frame(minHeight: 300)
+            } else {
+                EmptyStateView(icon: "magnifyingglass", title: "No matches",
+                               message: "Try removing some filters, or widen the distance.",
+                               buttonTitle: "Clear filters") { viewModel.clearFilters() }
+                    .frame(minHeight: 300)
             }
-            .frame(minHeight: 300)
+        case .error(let message):
+            if !listings.isConfigured {
+                EmptyStateView(icon: "icloud.slash", title: "Not connected yet",
+                               message: "PawFinder needs its Firebase setup to show listings. Follow docs/SETUP.md, then restart the app.")
+                    .frame(minHeight: 300)
+            } else {
+                ErrorView(message: message) {
+                    Task { await viewModel.reload(showSkeleton: true) }
+                }
+                .frame(minHeight: 300)
+            }
         case .loaded:
             if showsList {
                 LazyVStack(spacing: Spacing.sm) {
@@ -215,20 +235,17 @@ struct DiscoverView: View {
         }
     }
 
-    private var sampleBanner: some View {
-        Label(Secrets.hasPetfinderKeys
-              ? "Petfinder isn't reachable right now, so you're seeing sample pets."
-              : "You're seeing sample pets. Add Petfinder keys to see real adoptable pets.",
-              systemImage: "sparkles")
-            .font(.subheadline)
-            .foregroundStyle(Color.pfTextPrimary)
-            .padding(Spacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.pfBrandDeep, in: RoundedRectangle(cornerRadius: Radius.medium))
+    /// Sign in if needed, set up as a lister the first time, then open the new-listing form.
+    private func startListing() {
+        guard auth.user != nil else {
+            router.showSignIn = true
+            return
+        }
+        router.open(listerProfile.isLister ? .newListing : .listerSetup, in: .profile)
     }
 
-    private func offlineBanner(_ date: Date) -> some View {
-        Label("You're offline. Showing pets saved \(date.formatted(.relative(presentation: .named))).",
+    private var offlineBanner: some View {
+        Label("You're offline. Showing the listings saved on your phone.",
               systemImage: "wifi.slash")
             .font(.subheadline)
             .foregroundStyle(Color.pfTextPrimary)
@@ -329,4 +346,7 @@ struct DiscoverView: View {
     .environment(MessagesStore())
     .environment(SavedSearchesStore())
     .environment(Router())
+    .environment(ListingsService())
+    .environment(ListerProfileStore())
+    .environment(NetworkMonitor())
 }

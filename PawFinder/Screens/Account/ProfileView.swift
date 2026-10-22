@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The Profile tab: who you are, your lifestyle answers, and links to
-/// followed shelters, settings, and your account.
+/// The Profile tab: who you are, the tools for listing pets (same account,
+/// no separate login), your lifestyle answers, and links to messages,
+/// applications, settings, and your account.
 struct ProfileView: View {
     @Environment(AuthManager.self) private var auth
     @Environment(ProfileStore.self) private var profileStore
@@ -9,6 +10,8 @@ struct ProfileView: View {
     @Environment(MessagesStore.self) private var messages
     @Environment(FavoritesStore.self) private var favorites
     @Environment(FollowedSheltersStore.self) private var followed
+    @Environment(ListerProfileStore.self) private var listerProfile
+    @Environment(ListingsService.self) private var listings
     @Environment(Router.self) private var router
     @State private var showAuth = false
 
@@ -21,6 +24,15 @@ struct ProfileView: View {
                     PFButton(title: "Sign in or create account") { showAuth = true }
                         .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.lg, bottom: Spacing.md, trailing: Spacing.lg))
                 }
+            }
+            .listRowBackground(Color.pfSurface)
+
+            Section {
+                listerRows
+            } header: {
+                Text("Rehoming a pet?")
+            } footer: {
+                Text("Anyone can list pets for adoption from their account, as an individual or a rescue.")
             }
             .listRowBackground(Color.pfSurface)
 
@@ -106,7 +118,7 @@ struct ProfileView: View {
                     Label("Edit profile", systemImage: "person.crop.circle")
                 }
                 NavigationLink(value: Route.followedShelters) {
-                    Label("Followed shelters", systemImage: "star")
+                    Label("Listers I follow", systemImage: "star")
                 }
                 if auth.user != nil {
                     NavigationLink(value: Route.account) {
@@ -131,6 +143,61 @@ struct ProfileView: View {
         .sheet(isPresented: $showAuth) { AuthSheet() }
     }
 
+    /// Sign in → set up (first time) → my listings, applications received, add a listing.
+    @ViewBuilder
+    private var listerRows: some View {
+        if auth.user == nil {
+            Button {
+                router.showSignIn = true
+            } label: {
+                Label("Sign in to list a pet for adoption", systemImage: "plus.circle")
+            }
+        } else if !listerProfile.isLister {
+            NavigationLink(value: Route.listerSetup) {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Label("List a pet for adoption", systemImage: "plus.circle.fill")
+                        .foregroundStyle(Color.pfBrandPrimary)
+                    Text("Takes a minute to set up. Adopters nearby will see your pets right away.")
+                        .font(.pfCaption)
+                        .foregroundStyle(Color.pfTextSecondary)
+                }
+            }
+        } else {
+            Button {
+                router.push(.newListing)
+            } label: {
+                Label("Add a new listing", systemImage: "plus.circle.fill")
+                    .foregroundStyle(Color.pfBrandPrimary)
+            }
+            NavigationLink(value: Route.myListings) {
+                HStack {
+                    Label("My listings", systemImage: "pawprint")
+                    Spacer()
+                    Text("\(listings.myListings.count)")
+                        .font(.pfCaption)
+                        .foregroundStyle(Color.pfTextSecondary)
+                }
+            }
+            NavigationLink(value: Route.receivedApplications) {
+                HStack {
+                    Label("Applications received", systemImage: "tray")
+                    Spacer()
+                    if applications.newReceivedCount > 0 {
+                        Text("\(applications.newReceivedCount) new")
+                            .font(.pfCaption.weight(.bold))
+                            .foregroundStyle(Color.pfSurfaceElevated)
+                            .padding(.horizontal, Spacing.sm)
+                            .padding(.vertical, 2)
+                            .background(Color.pfBrandPrimary, in: Capsule())
+                    }
+                }
+            }
+            NavigationLink(value: Route.listerSetup) {
+                Label("Lister profile", systemImage: "person.text.rectangle")
+            }
+        }
+    }
+
     private var adopted: [AdoptionApplication] {
         applications.applications.filter { $0.status == .adopted }
     }
@@ -142,7 +209,7 @@ struct ProfileView: View {
             statTile(applications.applications.filter { $0.status != .draft }.count, "Applications") {
                 router.push(.applications)
             }
-            statTile(followed.shelters.count, "Shelters") { router.push(.followedShelters) }
+            statTile(followed.shelters.count, "Following") { router.push(.followedShelters) }
         }
         .padding(.bottom, Spacing.sm)
     }

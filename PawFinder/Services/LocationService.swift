@@ -89,8 +89,8 @@ final class LocationService: NSObject, CLLocationManagerDelegate {
 }
 
 extension CLLocation {
-    /// "37.77,-122.42", the format Petfinder accepts for `location`.
-    var petfinderQuery: String {
+    /// "37.77,-122.42": a place written as text, which the listings search understands.
+    var coordinateText: String {
         String(format: "%.4f,%.4f", coordinate.latitude, coordinate.longitude)
     }
 

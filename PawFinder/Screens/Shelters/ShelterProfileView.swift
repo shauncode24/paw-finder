@@ -1,14 +1,12 @@
 import SwiftUI
 
-/// A shelter's page: photo, open-now, follow, contact, map, hours, about,
-/// adoption policy, and the pets it currently has.
+/// A lister's page (a person or a rescue): photo, follow, contact, about, adoption
+/// requirements, and the pets they currently have. Chats happen from a pet's page.
 struct ShelterProfileView: View {
     @State private var viewModel: ShelterProfileViewModel
     @State private var isAboutExpanded = false
     @Environment(FollowedSheltersStore.self) private var followed
     @Environment(LocationService.self) private var locationService
-    @Environment(MessagesStore.self) private var messages
-    @Environment(Router.self) private var router
 
     private let columns = [GridItem(.adaptive(minimum: 160), spacing: Spacing.md)]
 
@@ -20,7 +18,7 @@ struct ShelterProfileView: View {
         Group {
             switch viewModel.state {
             case .loading:
-                LoadingView(message: "Loading shelter...")
+                LoadingView(message: "Loading profile...")
             case .error(let message):
                 ErrorView(message: message) { Task { await viewModel.load() } }
             case .loaded(let shelter):
@@ -40,14 +38,10 @@ struct ShelterProfileView: View {
                 VStack(alignment: .leading, spacing: Spacing.xl) {
                     titleBlock(shelter)
                     followButton(shelter)
-                    PFButton(title: "Message \(shelter.name)", style: .secondary) {
-                        let id = messages.startConversation(shelterID: shelter.id, shelterName: shelter.name, pet: nil)
-                        router.push(.conversation(id))
-                    }
-                    ContactButtons(phone: shelter.phone, email: shelter.email,
-                                   website: shelter.website ?? shelter.petfinderURL)
+                    ContactButtons(phone: shelter.phone, email: shelter.email, website: shelter.website)
 
-                    if let coordinate = viewModel.coordinate {
+                    // Only organizations with a street address get an exact map; individuals show a general area.
+                    if let coordinate = viewModel.coordinate, !shelter.address.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.sm) {
                             ShelterMiniMap(name: shelter.name, coordinate: coordinate)
                             Link(destination: MapsLink.directions(name: shelter.name, coordinate: coordinate)) {
@@ -94,7 +88,7 @@ struct ShelterProfileView: View {
         }
         .navigationTitle(shelter.name)
         .toolbar {
-            if let url = shelter.petfinderURL ?? shelter.website {
+            if let url = shelter.website {
                 ToolbarItem(placement: .topBarTrailing) {
                     ShareLink(item: url, subject: Text(shelter.name))
                 }

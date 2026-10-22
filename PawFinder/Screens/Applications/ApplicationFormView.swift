@@ -22,9 +22,12 @@ struct ApplicationFormView: View {
     }
 
     @Environment(ApplicationsStore.self) private var store
+    @Environment(AuthManager.self) private var auth
     @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
 
+    @State private var isSubmitting = false
+    @State private var submitError: String?
     @State private var form = ApplicationForm()
     @State private var step: Step = .aboutYou
     @State private var showErrors = false
@@ -53,6 +56,12 @@ struct ApplicationFormView: View {
         }
         .onChange(of: form) { _, newForm in
             store.updateForm(applicationID, newForm)
+        }
+        .alert("Couldn't send your application", isPresented: Binding(get: { submitError != nil },
+                                                                    set: { if !$0 { submitError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(submitError ?? "")
         }
     }
 
@@ -129,7 +138,7 @@ struct ApplicationFormView: View {
                 PFButton(title: "Back", style: .secondary) { move(by: -1) }
             }
             if step == .review {
-                PFButton(title: "Submit application") { submit() }
+                PFButton(title: "Submit application", isLoading: isSubmitting) { submit() }
             } else {
                 PFButton(title: "Next") { next() }
             }
@@ -155,7 +164,7 @@ struct ApplicationFormView: View {
             TextField("Home address", text: $form.address, axis: .vertical)
                 .textContentType(.fullStreetAddress)
         } footer: {
-            Text("The shelter uses these to contact you. They're only saved on this phone.")
+            Text("The lister sees these when you submit, and uses them to contact you.")
         }
         Section {
             Toggle("I'm 18 or older", isOn: $form.isAdult)
@@ -207,7 +216,7 @@ struct ApplicationFormView: View {
         } header: {
             Text("Vet reference (optional)")
         } footer: {
-            Text("If you've had pets before, shelters often call your vet.")
+            Text("If you've had pets before, listers often call your vet.")
         }
     }
 
@@ -235,7 +244,7 @@ struct ApplicationFormView: View {
                               attachments: application.attachments.filter { $0.kind == kind })
             }
         } footer: {
-            Text("Optional, but some shelters ask for these. Photos stay on this phone and are only shown in your application.")
+            Text("Optional, but some listers ask for these. For your privacy, these photos stay on this phone and are not uploaded.")
         }
     }
 
@@ -259,7 +268,7 @@ struct ApplicationFormView: View {
             editButton(.plans)
         }
         Section {
-            Toggle("I agree to a home visit if the shelter asks", isOn: $form.agreesToHomeVisit)
+            Toggle("I agree to a home visit if the lister asks", isOn: $form.agreesToHomeVisit)
             Toggle("Everything I've written is true", isOn: $form.confirmsAccurate)
         }
     }
@@ -291,7 +300,7 @@ struct ApplicationFormView: View {
             if form.experience == nil { errors.append("Choose your pet experience.") }
         case .plans:
             if form.whyThisPet.trimmingCharacters(in: .whitespacesAndNewlines).count < 20 {
-                errors.append("Tell the shelter a little more about why (at least a sentence).")
+                errors.append("Tell the lister a little more about why (at least a sentence).")
             }
         case .documents:
             break
@@ -324,9 +333,22 @@ struct ApplicationFormView: View {
             withAnimation { showErrors = true }
             return
         }
+        // Applications go to a real person, so an account is needed. The draft is kept.
+        guard auth.user != nil else {
+            router.showSignIn = true
+            return
+        }
         store.updateForm(applicationID, form)
-        store.submit(applicationID)
-        withAnimation { submitted = true }
+        isSubmitting = true
+        Task {
+            defer { isSubmitting = false }
+            do {
+                try await store.submit(applicationID, adopterName: form.fullName)
+                withAnimation { submitted = true }
+            } catch {
+                submitError = error.localizedDescription
+            }
+        }
     }
 
     // MARK: - Confirmation
@@ -342,11 +364,8 @@ struct ApplicationFormView: View {
             Text("Application sent!")
                 .font(.largeTitle.bold())
                 .foregroundStyle(Color.pfTextPrimary)
-            Text("\(application.shelterName ?? "The shelter") will review your application for \(application.pet.name). We'll notify you when anything changes.")
+            Text("\(application.shelterName ?? "The lister") will review your application for \(application.pet.name). We'll notify you when anything changes. You can also message them from the tracker.")
                 .multilineTextAlignment(.center)
-                .foregroundStyle(Color.pfTextSecondary)
-            Text("Demo: the shelter is simulated and replies within a few minutes.")
-                .font(.pfCaption)
                 .foregroundStyle(Color.pfTextSecondary)
             Spacer()
             PFButton(title: "Track your application") {

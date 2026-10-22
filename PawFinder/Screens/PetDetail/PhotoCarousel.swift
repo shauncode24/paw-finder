@@ -77,8 +77,9 @@ private struct ZoomableImage: View {
 
     var body: some View {
         GeometryReader { proxy in
-            AsyncImage(url: url) { phase in
-                if let image = phase.image {
+            RemoteImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
                     image
                         .resizable()
                         .scaledToFit()
@@ -88,9 +89,9 @@ private struct ZoomableImage: View {
                         // Only grab drags while zoomed, so swiping between photos still works.
                         .simultaneousGesture(scale > 1 ? pan : nil)
                         .onTapGesture(count: 2) { toggleZoom() }
-                } else if phase.error != nil {
+                case .failure:
                     Image(systemName: "photo").foregroundStyle(.white)
-                } else {
+                case .empty:
                     ProgressView().tint(.white)
                 }
             }

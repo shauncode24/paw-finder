@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// Lets the user flag a listing as wrong or inappropriate.
-/// There's no backend yet, so reports are only saved on the device
-/// (see docs/Leftover.md, Phase 3).
+/// Lets the user flag a listing as wrong or inappropriate. Reports are saved in
+/// Firestore (`reports`) for a moderator to read (see docs/Listers-and-Messaging.md).
 struct ReportListingSheet: View {
     let pet: Pet
     @Environment(\.dismiss) private var dismiss
+    @Environment(ListingsService.self) private var listings
 
     @State private var reason: Reason = .alreadyAdopted
     @State private var details = ""
@@ -66,14 +66,17 @@ struct ReportListingSheet: View {
     }
 
     private func submit() {
-        // Keep a simple local log until there's a backend to send it to.
-        var reports = UserDefaults.standard.stringArray(forKey: "listingReports") ?? []
-        reports.append("\(Date.now.ISO8601Format()) | pet \(pet.id) | \(reason.rawValue) | \(details)")
-        UserDefaults.standard.set(reports, forKey: "listingReports")
+        let service = listings
+        let petID = pet.id
+        let chosenReason = reason.rawValue
+        let extra = details
+        // Fire and forget: the report is queued even if the phone is offline.
+        Task { await service.report(listingID: petID, reason: chosenReason, details: extra) }
         withAnimation { submitted = true }
     }
 }
 
 #Preview {
     ReportListingSheet(pet: MockPetRepository.samplePets[0])
+        .environment(ListingsService())
 }

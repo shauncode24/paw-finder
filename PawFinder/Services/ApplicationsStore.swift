@@ -1,31 +1,51 @@
+import FirebaseAuth
+import FirebaseCore
+import FirebaseFirestore
 import UIKit
 
-/// Adoption applications, saved on the device (Documents/applications.json,
-/// with attached photos in Documents/ApplicationFiles/).
+/// Adoption applications.
 ///
-/// There's no shelter on the other end, so a **simulated shelter** answers:
-/// when you submit, it plans replies a few minutes apart (in review →
-/// interview → decision). `refresh()` applies the ones whose time has come,
-/// and local notifications fire at the same times.
+/// - **Adopters:** drafts live on the phone (`Documents/applications.json`, attached
+///   photos in `Documents/ApplicationFiles/`). When submitted, the application is
+///   written to Firestore (`applications/{id}`) for the lister to read, and the
+///   adopter's phone then follows its status live.
+/// - **Listers:** `received` is a live list of applications for their pets. They
+///   change the status (in review → interview → approved / declined → adopted) and
+///   the adopter sees it immediately.
+///
+/// Attached photos (ID, lease…) stay on the adopter's phone on purpose: they're
+/// sensitive and shouldn't sit in a shared database.
 @MainActor
 @Observable
 final class ApplicationsStore {
     private(set) var applications: [AdoptionApplication] = []
+    /// Applications for the signed-in user's own listings, newest first.
+    private(set) var received: [ReceivedApplication] = []
+    private(set) var userID: String?
 
-    /// How long the simulated shelter takes for each step (fast, for demos).
-    static let simulatedReplyDelays: [TimeInterval] = [60, 3 * 60, 6 * 60]
+    /// Applications that haven't been looked at yet.
+    var newReceivedCount: Int { received.filter { $0.status == .submitted }.count }
 
     private let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("applications.json")
     @ObservationIgnored private var pendingSave: Task<Void, Never>?
+    @ObservationIgnored private var mineListener: ListenerRegistration?
+    @ObservationIgnored private var receivedListener: ListenerRegistration?
+    @ObservationIgnored private var receivedLoaded = false
+
+    private var isConfigured: Bool { FirebaseApp.app() != nil }
+    private var db: Firestore { Firestore.firestore() }
 
     init() {
         load()
-        refresh()
     }
 
     func application(_ id: UUID) -> AdoptionApplication? {
         applications.first { $0.id == id }
+    }
+
+    func receivedApplication(_ id: String) -> ReceivedApplication? {
+        received.first { $0.id == id }
     }
 
     /// The draft or active application for a pet, if any (one per pet).
@@ -33,7 +53,90 @@ final class ApplicationsStore {
         applications.first { $0.pet.id == petID && !$0.isClosed }
     }
 
-    // MARK: - Drafts
+    // MARK: - Live updates
+
+    /// Call whenever the signed-in user changes (nil = signed out).
+    func start(for uid: String?) {
+        guard uid != userID else { return }
+        mineListener?.remove()
+        receivedListener?.remove()
+        mineListener = nil
+        receivedListener = nil
+        received = []
+        receivedLoaded = false
+        userID = uid
+
+        guard isConfigured, let uid else { return }
+
+        // As an adopter: follow the status of what I applied for.
+        mineListener = db.collection("applications").whereField("adopterID", isEqualTo: uid)
+            .addSnapshotListener { [weak self] snapshot, _ in
+                Task { @MainActor in self?.handleMine(snapshot) }
+            }
+
+        // As a lister: applications for my pets.
+        receivedListener = db.collection("applications").whereField("listerID", isEqualTo: uid)
+            .addSnapshotListener { [weak self] snapshot, _ in
+                Task { @MainActor in self?.handleReceived(snapshot, uid: uid) }
+            }
+    }
+
+    private func handleMine(_ snapshot: QuerySnapshot?) {
+        guard let snapshot else { return }
+        for document in snapshot.documents where !document.metadata.hasPendingWrites {
+            merge(remote: document.data(with: .estimate), id: document.documentID)
+        }
+    }
+
+    /// Copies the lister's decisions onto my local copy, and notifies me of new ones.
+    private func merge(remote data: [String: Any], id: String) {
+        guard let uuid = UUID(uuidString: id), let index = index(of: uuid) else { return }
+        let remoteEvents = ApplicationJSON.events(from: data["events"])
+        let knownIDs = Set(applications[index].events.map(\.id))
+        let newEvents = remoteEvents.filter { !knownIDs.contains($0.id) }
+        guard !newEvents.isEmpty || (data["status"] as? String) != applications[index].status.rawValue else { return }
+
+        if let status = ApplicationStatus(rawValue: (data["status"] as? String) ?? "") {
+            applications[index].status = status
+            if status == .approved, applications[index].checklist.isEmpty {
+                applications[index].checklist = ChecklistItem.afterApproval
+            }
+        }
+        if !remoteEvents.isEmpty { applications[index].events = remoteEvents }
+        applications[index].updatedAt = .now
+        save()
+
+        // Tell the adopter about anything the lister did (not their own submit/withdraw).
+        let petName = applications[index].pet.name
+        for event in newEvents where event.status != .submitted && event.status != .withdrawn {
+            Task {
+                await NotificationManager.shared.notifyApplicationUpdate(applicationID: uuid, petName: petName,
+                                                                         status: event.status, note: event.note)
+            }
+        }
+    }
+
+    private func handleReceived(_ snapshot: QuerySnapshot?, uid: String) {
+        guard let snapshot, userID == uid else { return }
+        if receivedLoaded {
+            for change in snapshot.documentChanges where change.type == .added && !change.document.metadata.hasPendingWrites {
+                if let application = ReceivedApplication(id: change.document.documentID,
+                                                         data: change.document.data(with: .estimate)) {
+                    Task {
+                        await NotificationManager.shared.notifyNewApplication(
+                            applicationID: application.id, petName: application.petName,
+                            applicantName: application.adopterName)
+                    }
+                }
+            }
+        }
+        received = snapshot.documents
+            .compactMap { ReceivedApplication(id: $0.documentID, data: $0.data(with: .estimate)) }
+            .sorted { $0.submittedAt > $1.submittedAt }
+        receivedLoaded = true
+    }
+
+    // MARK: - Drafts (adopter, on the phone)
 
     /// Resumes this pet's draft/application, or starts a new draft
     /// pre-filled from the profile.
@@ -50,7 +153,7 @@ final class ApplicationsStore {
         if profile.schedule == .awayAllDay { form.hoursAlonePerDay = 8 }
         if profile.schedule == .mostlyHome { form.hoursAlonePerDay = 2 }
 
-        let application = AdoptionApplication(pet: pet, shelterName: shelterName, form: form)
+        let application = AdoptionApplication(pet: pet, shelterName: shelterName ?? pet.listedBy, form: form)
         applications.insert(application, at: 0)
         save()
         return application.id
@@ -69,9 +172,9 @@ final class ApplicationsStore {
         }
     }
 
-    /// Erase every application and attachment (Settings › Erase all data).
+    /// Erase every application kept on this phone, and attached photos (Settings › Erase all data).
+    /// Applications already sent to a lister stay with them.
     func removeAll() {
-        for application in applications { NotificationManager.shared.cancelApplicationUpdates(application.id) }
         try? FileManager.default.removeItem(at: FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("ApplicationFiles", isDirectory: true))
         applications = []
@@ -85,7 +188,7 @@ final class ApplicationsStore {
         save()
     }
 
-    // MARK: - Attachments
+    // MARK: - Attachments (stay on the phone)
 
     func addAttachment(to id: UUID, kind: ApplicationAttachment.Kind, imageData: Data) {
         guard let index = index(of: id), let image = UIImage(data: imageData) else { return }
@@ -112,46 +215,66 @@ final class ApplicationsStore {
         filesFolder(for: applicationID).appendingPathComponent(attachment.fileName)
     }
 
-    // MARK: - Submit / withdraw / adopt
+    // MARK: - Submit / withdraw / adopt (adopter)
 
-    func submit(_ id: UUID) {
+    /// Sends the application to the lister.
+    func submit(_ id: UUID, adopterName: String) async throws {
+        guard isConfigured else { throw APIError.notConfigured }
+        guard let uid = userID else { throw APIError.notSignedIn }
         guard let index = index(of: id), applications[index].status == .draft else { return }
+        let application = applications[index]
+        guard application.pet.shelterID != uid else {
+            throw BackendMessage(text: "This is your own listing, so you can't apply for it.")
+        }
+
         let now = Date.now
+        let event = ApplicationStatusEvent(status: .submitted, date: now)
+        let data: [String: Any] = [
+            "adopterID": uid,
+            "adopterName": adopterName,
+            "listerID": application.pet.shelterID,
+            "listingID": application.pet.id,
+            "petName": application.pet.name,
+            "petSpecies": application.pet.species,
+            "status": ApplicationStatus.submitted.rawValue,
+            "formJSON": ApplicationJSON.text(application.form),
+            "events": [ApplicationJSON.text(event)],
+            "submittedAt": Timestamp(date: now),
+            "updatedAt": FieldValue.serverTimestamp(),
+        ]
+
+        let reference = db.collection("applications").document(id.uuidString)
+        do {
+            try await withNetworkTimeout { try await reference.setData(data) }
+        } catch {
+            throw backendError(error)
+        }
+
         applications[index].status = .submitted
         applications[index].submittedAt = now
-        applications[index].events = [ApplicationStatusEvent(status: .submitted, date: now)]
-        applications[index].scheduledEvents = Self.simulatedReplies(for: applications[index], submittedAt: now)
+        applications[index].events = [event]
         save()
-        let application = applications[index]
-        Task {
-            await NotificationManager.shared.askPermission(for: .applications)
-            await NotificationManager.shared.scheduleApplicationUpdates(application)
-        }
-    }
-
-    /// After the user turns notifications on, schedule the ones we couldn't before.
-    func rescheduleNotifications() async {
-        for application in applications where application.isActive && !application.scheduledEvents.isEmpty {
-            await NotificationManager.shared.scheduleApplicationUpdates(application)
-        }
+        Task { await NotificationManager.shared.askPermission(for: .applications) }
     }
 
     func withdraw(_ id: UUID) {
         guard let index = index(of: id), applications[index].isActive else { return }
+        let event = ApplicationStatusEvent(status: .withdrawn, date: .now)
         applications[index].status = .withdrawn
-        applications[index].events.append(ApplicationStatusEvent(status: .withdrawn, date: .now))
-        applications[index].scheduledEvents = []
+        applications[index].events.append(event)
         save()
-        NotificationManager.shared.cancelApplicationUpdates(id)
+        pushStatus(of: id, status: .withdrawn, event: event)
     }
 
     /// "We brought them home!"
     func markAdopted(_ id: UUID) {
         guard let index = index(of: id), applications[index].status == .approved else { return }
+        let event = ApplicationStatusEvent(status: .adopted, date: .now,
+                                           note: "Welcome home, \(applications[index].pet.name)!")
         applications[index].status = .adopted
-        applications[index].events.append(ApplicationStatusEvent(status: .adopted, date: .now,
-                                                                  note: "Welcome home, \(applications[index].pet.name)!"))
+        applications[index].events.append(event)
         save()
+        pushStatus(of: id, status: .adopted, event: event)
     }
 
     func toggleChecklistItem(_ itemID: UUID, in id: UUID) {
@@ -161,72 +284,37 @@ final class ApplicationsStore {
         save()
     }
 
-    // MARK: - Simulated shelter
+    // MARK: - Reviewing (lister)
 
-    /// Applies any simulated shelter replies whose time has passed.
-    /// Called on launch, when the app comes back to the foreground, and while
-    /// an application is on screen.
-    func refresh(now: Date = .now) {
-        var changed = false
-        for index in applications.indices where applications[index].isActive {
-            while let next = applications[index].scheduledEvents.first, next.date <= now {
-                applications[index].scheduledEvents.removeFirst()
-                apply(next, at: index)
-                changed = true
-            }
-        }
-        if changed { save() }
+    /// The lister moves an application along. The adopter sees it right away.
+    func updateStatus(_ applicationID: String, to status: ApplicationStatus, note: String?) {
+        guard isConfigured else { return }
+        let cleanNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let event = ApplicationStatusEvent(status: status, date: .now, note: (cleanNote?.isEmpty ?? true) ? nil : cleanNote)
+        db.collection("applications").document(applicationID).updateData([
+            "status": status.rawValue,
+            "updatedAt": FieldValue.serverTimestamp(),
+            "events": FieldValue.arrayUnion([ApplicationJSON.text(event)]),
+        ], completion: nil)
     }
 
-    /// Debug helper: make the shelter's next reply happen right now.
-    func simulateNextReply(_ id: UUID) {
-        guard let index = index(of: id), !applications[index].scheduledEvents.isEmpty else { return }
-        let next = applications[index].scheduledEvents.removeFirst()
-        apply(ApplicationStatusEvent(status: next.status, date: .now, note: next.note), at: index)
-        save()
-        NotificationManager.shared.cancelApplicationUpdate(id, status: next.status)
+    /// Writes an adopter-side status change (withdrawn / adopted) to the shared copy.
+    private func pushStatus(of id: UUID, status: ApplicationStatus, event: ApplicationStatusEvent) {
+        guard isConfigured else { return }
+        db.collection("applications").document(id.uuidString).updateData([
+            "status": status.rawValue,
+            "updatedAt": FieldValue.serverTimestamp(),
+            "events": FieldValue.arrayUnion([ApplicationJSON.text(event)]),
+        ], completion: nil)
     }
 
-    private func apply(_ event: ApplicationStatusEvent, at index: Int) {
-        applications[index].status = event.status
-        applications[index].events.append(event)
-        if event.status == .approved, applications[index].checklist.isEmpty {
-            applications[index].checklist = ChecklistItem.afterApproval
+    /// Run by iOS's background refresh: one quick look for decisions made while the app was closed.
+    func backgroundCheck() async {
+        guard isConfigured, let uid = Auth.auth().currentUser?.uid else { return }
+        let snapshot = try? await db.collection("applications").whereField("adopterID", isEqualTo: uid).getDocuments()
+        for document in snapshot?.documents ?? [] {
+            merge(remote: document.data(with: .estimate), id: document.documentID)
         }
-    }
-
-    /// The shelter's planned replies. It approves unless something in the
-    /// answers is a clear blocker (like renting without the landlord's OK).
-    private static func simulatedReplies(for application: AdoptionApplication, submittedAt: Date) -> [ApplicationStatusEvent] {
-        let form = application.form
-        let shelter = application.shelterName ?? "The shelter"
-        let dates = simulatedReplyDelays.map { submittedAt.addingTimeInterval($0) }
-
-        var declineReason: String?
-        if form.ownsHome == false, !form.landlordAllowsPets {
-            declineReason = "Your landlord needs to allow pets before we can place \(application.pet.name) with you."
-        } else if form.hoursAlonePerDay >= 10 {
-            declineReason = "\(application.pet.name) needs more company than a 10+ hour day alone allows."
-        }
-
-        var replies = [
-            ApplicationStatusEvent(status: .inReview, date: dates[0],
-                                   note: "\(shelter) received your application and is reviewing it."),
-        ]
-        if let declineReason {
-            replies.append(ApplicationStatusEvent(status: .declined, date: dates[1], note: declineReason))
-        } else {
-            let contact = form.phone.isEmpty ? form.email : form.phone
-            replies.append(ApplicationStatusEvent(
-                status: .interview, date: dates[1],
-                note: "\(shelter) would like to chat and arrange a meet-and-greet. They'll contact you at \(contact)."
-            ))
-            replies.append(ApplicationStatusEvent(
-                status: .approved, date: dates[2],
-                note: "Great news: you're approved to adopt \(application.pet.name)!"
-            ))
-        }
-        return replies
     }
 
     // MARK: - Storage

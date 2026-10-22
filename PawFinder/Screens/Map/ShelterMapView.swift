@@ -97,7 +97,7 @@ struct ShelterMapView: View {
         } else {
             ClusterBubble(count: cluster.shelters.count)
                 .onTapGesture { zoom(into: cluster) }
-                .accessibilityLabel("\(cluster.shelters.count) shelters. Double tap to zoom in.")
+                .accessibilityLabel("\(cluster.shelters.count) listers. Double tap to zoom in.")
                 .accessibilityAddTraits(.isButton)
         }
     }
@@ -140,7 +140,7 @@ struct ShelterMapView: View {
                 .listRowBackground(Color.pfSurface)
             }
             if viewModel.hasMore {
-                Button("Load more shelters") { Task { await viewModel.loadMore() } }
+                Button("Load more listers") { Task { await viewModel.loadMore() } }
                     .listRowBackground(Color.pfSurface)
             }
         }
@@ -148,7 +148,7 @@ struct ShelterMapView: View {
         .background(Color.pfBackground)
         .overlay {
             if case .loaded = viewModel.state, visible.isEmpty {
-                EmptyStateView(icon: "house", title: "No shelters", message: "Try a bigger distance or fewer filters.")
+                EmptyStateView(icon: "house", title: "No listers here", message: "Try a bigger distance or fewer filters.")
             }
         }
     }
@@ -159,7 +159,7 @@ struct ShelterMapView: View {
         VStack(spacing: Spacing.sm) {
             HStack(spacing: Spacing.sm) {
                 Image(systemName: "magnifyingglass").foregroundStyle(Color.pfTextSecondary)
-                TextField("ZIP code or City, ST", text: $placeText)
+                TextField("Postcode or city", text: $placeText)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
@@ -210,7 +210,7 @@ struct ShelterMapView: View {
             case .needsLocation:
                 startCard
             case .loading:
-                messageCard("Finding shelters...", icon: nil, showsProgress: true)
+                messageCard("Finding listers...", icon: nil, showsProgress: true)
             case .error(let message):
                 messageCard(message, icon: "exclamationmark.triangle")
             case .loaded:
@@ -246,7 +246,7 @@ struct ShelterMapView: View {
 
     private var summaryText: String {
         let count: Int = visible.count
-        let noun: String = count == 1 ? "shelter" : "shelters"
+        let noun: String = count == 1 ? "lister" : "listers"
         var text: String = "\(count) \(noun)"
         if viewModel.isGeocoding { text += " · placing pins..." }
         if count < viewModel.shelters.count { text += " (filtered)" }
@@ -256,11 +256,11 @@ struct ShelterMapView: View {
     private var startCard: some View {
         PFCard {
             VStack(alignment: .leading, spacing: Spacing.sm) {
-                Text("Find shelters near you")
+                Text("Find pets and listers near you")
                     .font(.pfHeadline)
                     .foregroundStyle(Color.pfTextPrimary)
                 Text(locationService.isDenied
-                     ? "Location is off. Type a ZIP code or city above."
+                     ? "Location is off. Type a postcode or city above."
                      : "Use your location, or type a ZIP code or city above.")
                     .font(.subheadline)
                     .foregroundStyle(Color.pfTextSecondary)
@@ -289,7 +289,7 @@ struct ShelterMapView: View {
         locationError = nil
         do {
             let location = try await locationService.requestLocation()
-            await search(location: location.petfinderQuery, center: location.coordinate)
+            await search(location: location.coordinateText, center: location.coordinate)
         } catch {
             locationError = error.localizedDescription
         }
@@ -454,7 +454,7 @@ private struct SelectedShelterCard: View {
                 }
                 HStack(spacing: Spacing.sm) {
                     NavigationLink(value: Route.shelter(id: shelter.id)) {
-                        Text("View shelter")
+                        Text("View profile")
                             .font(.pfHeadline)
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .foregroundStyle(Color.pfSurfaceElevated)

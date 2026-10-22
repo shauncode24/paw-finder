@@ -7,7 +7,10 @@ struct ApplicationDetailView: View {
 
     @Environment(ApplicationsStore.self) private var store
     @Environment(MessagesStore.self) private var messages
+    @Environment(AuthManager.self) private var auth
+    @Environment(ProfileStore.self) private var profileStore
     @Environment(Router.self) private var router
+    @State private var chatError: String?
     @State private var confirmWithdraw = false
     @State private var celebrate = false
     @State private var showAnswers = false
@@ -23,11 +26,27 @@ struct ApplicationDetailView: View {
         .background(Color.pfBackground)
         .navigationTitle("Application")
         .navigationBarTitleDisplayMode(.inline)
-        // Check for simulated shelter replies while this screen is open.
-        .task {
-            while !Task.isCancelled {
-                store.refresh()
-                try? await Task.sleep(for: .seconds(10))
+        .alert("Couldn't open the chat", isPresented: Binding(get: { chatError != nil },
+                                                             set: { if !$0 { chatError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(chatError ?? "")
+        }
+    }
+
+    private func openChat(_ application: AdoptionApplication) {
+        guard let me = auth.user else {
+            router.showSignIn = true
+            return
+        }
+        let name = profileStore.profile.displayName.isEmpty ? (me.displayName ?? "") : profileStore.profile.displayName
+        Task {
+            do {
+                let id = try await messages.openChat(about: application.pet, listerName: application.shelterName,
+                                                     as: me, displayName: name)
+                router.push(.conversation(id))
+            } catch {
+                chatError = error.localizedDescription
             }
         }
     }
@@ -42,7 +61,7 @@ struct ApplicationDetailView: View {
                     checklist(application)
                 }
 
-                section("Timeline") { ApplicationTimeline(application: application) }
+                section("Timeline") { ApplicationTimeline(events: application.events) }
 
                 if !application.attachments.isEmpty {
                     section("Documents") {
@@ -78,7 +97,7 @@ struct ApplicationDetailView: View {
         .confirmationDialog("Withdraw this application?", isPresented: $confirmWithdraw, titleVisibility: .visible) {
             Button("Withdraw", role: .destructive) { store.withdraw(applicationID) }
         } message: {
-            Text("The shelter will stop reviewing it. You can apply again later.")
+            Text("The lister will stop reviewing it. You can apply again later.")
         }
     }
 
@@ -118,11 +137,6 @@ struct ApplicationDetailView: View {
                 StatusBadge(status: application.status)
                 Text(latestNote ?? application.status.explanation)
                     .foregroundStyle(Color.pfTextPrimary)
-                if let next = application.scheduledEvents.first {
-                    Text("Next update expected \(next.date.formatted(.relative(presentation: .named))).")
-                        .font(.pfCaption)
-                        .foregroundStyle(Color.pfTextSecondary)
-                }
             }
         }
     }
@@ -170,25 +184,14 @@ struct ApplicationDetailView: View {
                 }
             }
             if !application.isClosed {
-                PFButton(title: "Message the shelter", style: .secondary) {
-                    let id = messages.startConversation(shelterID: application.pet.shelterID,
-                                                        shelterName: application.shelterName ?? "Shelter",
-                                                        pet: application.pet)
-                    router.push(.conversation(id))
+                PFButton(title: "Message \(application.shelterName ?? "the lister")", style: .secondary) {
+                    openChat(application)
                 }
             }
             if application.isActive {
                 Button("Withdraw application", role: .destructive) { confirmWithdraw = true }
                     .font(.subheadline)
             }
-            #if DEBUG
-            if !application.scheduledEvents.isEmpty {
-                Button("Demo: simulate the shelter's next reply now") {
-                    store.simulateNextReply(applicationID)
-                }
-                .font(.pfCaption)
-            }
-            #endif
         }
         .frame(maxWidth: .infinity)
     }
@@ -256,7 +259,7 @@ struct StatusBadge: View {
 /// Submitted → In review → Interview → Decision → Adopted, with dates for
 /// the steps that happened and grey dots for the ones still to come.
 struct ApplicationTimeline: View {
-    let application: AdoptionApplication
+    let events: [ApplicationStatusEvent]
 
     private struct Row: Identifiable {
         let id: String
@@ -308,7 +311,7 @@ struct ApplicationTimeline: View {
 
     private var rows: [Row] {
         func event(_ status: ApplicationStatus) -> ApplicationStatusEvent? {
-            application.events.last { $0.status == status }
+            events.last { $0.status == status }
         }
         func row(_ status: ApplicationStatus, title: String? = nil, isBad: Bool = false) -> Row {
             let happened = event(status)

@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// Everything about one pet: photos, details, shelter, and similar pets.
+/// Everything about one pet: photos, details, who's listing them, and similar pets.
 struct PetDetailView: View {
     @State private var viewModel: PetDetailViewModel
     @State private var isDescriptionExpanded = false
     @State private var showReport = false
+    @State private var isOpeningChat = false
+    @State private var chatError: String?
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
     @Environment(FavoritesStore.self) private var favorites
     @Environment(LocationService.self) private var locationService
@@ -15,6 +17,15 @@ struct PetDetailView: View {
     @Environment(MessagesStore.self) private var messages
 
     private var pet: Pet { viewModel.pet }
+
+    /// True when the signed-in user is the one who listed this pet.
+    private var isMine: Bool { auth.user?.id == pet.shelterID }
+
+    /// The lister's name, once their profile has loaded.
+    private var listerName: String? {
+        if case .loaded(let shelter) = viewModel.shelterState { return shelter.name }
+        return pet.listedBy
+    }
 
     init(pet: Pet, repository: PetRepository) {
         _viewModel = State(initialValue: PetDetailViewModel(pet: pet, repository: repository))
@@ -28,24 +39,26 @@ struct PetDetailView: View {
                 VStack(alignment: .leading, spacing: Spacing.xl) {
                     statusBanner
                     header
-                    applyButton
-                    PFButton(title: "Message shelter", style: .secondary) { openChat() }
+                    if isMine {
+                        ownerControls
+                    } else {
+                        applyButton
+                        PFButton(title: "Message \(listerName ?? "the lister")", style: .secondary,
+                                 isLoading: isOpeningChat) { openChat() }
+                    }
                     attributeChips
                     if favorites.isFavorite(pet.id) {
                         FavoriteNotesSection(pet: pet)
                     }
                     about
-                    if let videos = pet.videoEmbeds, !videos.isEmpty {
-                        section("Videos") {
-                            ForEach(videos, id: \.self) { embed in
-                                PetVideoView(embedHTML: embed)
-                                    .frame(height: 200)
-                                    .clipShape(RoundedRectangle(cornerRadius: Radius.medium))
-                            }
+                    if let video = pet.videoLink {
+                        Link(destination: video) {
+                            Label("Watch \(pet.name)'s video", systemImage: "play.rectangle.fill")
+                                .font(.subheadline.weight(.semibold))
                         }
                     }
                     goodWith
-                    section("Shelter") {
+                    section("Listed by") {
                         ShelterCard(state: viewModel.shelterState,
                                     coordinate: viewModel.shelterCoordinate,
                                     userLocation: locationService.lastLocation,
@@ -68,7 +81,11 @@ struct PetDetailView: View {
                 FavoriteButton(pet: pet)
                 shareButton
                 Menu {
-                    Button("Report listing", systemImage: "flag") { showReport = true }
+                    if isMine {
+                        Button("Edit listing", systemImage: "pencil") { router.push(.editListing(pet.id)) }
+                    } else {
+                        Button("Report listing", systemImage: "flag") { showReport = true }
+                    }
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
@@ -79,7 +96,13 @@ struct PetDetailView: View {
             ReportListingSheet(pet: pet)
         }
         .task { await viewModel.load() }
-        // Handoff: pick up this pet on another device (or in Safari via its Petfinder link).
+        .alert("Couldn't open the chat", isPresented: Binding(get: { chatError != nil },
+                                                             set: { if !$0 { chatError = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(chatError ?? "")
+        }
+        // Handoff: pick up this pet on another device signed in to the same Apple ID.
         .userActivity("com.pawfinder.viewPet") { activity in
             activity.title = "\(pet.name) on PawFinder"
             activity.userInfo = ["petID": pet.id]
@@ -120,30 +143,62 @@ struct PetDetailView: View {
             .buttonStyle(.plain)
         } else if !pet.isAdopted {
             PFButton(title: "Apply to adopt \(pet.name)") {
-                var shelterName: String?
-                if case .loaded(let shelter) = viewModel.shelterState { shelterName = shelter.name }
-                let id = applications.startOrResume(pet: pet, shelterName: shelterName,
+                // Applications go to a real person, so an account is needed.
+                guard auth.user != nil else {
+                    router.showSignIn = true
+                    return
+                }
+                let id = applications.startOrResume(pet: pet, shelterName: listerName,
                                                     profile: profileStore.profile, email: auth.user?.email)
                 router.push(.applicationForm(id))
             }
         }
     }
 
-    private func openChat() {
-        var shelterName = "Shelter"
-        if case .loaded(let shelter) = viewModel.shelterState { shelterName = shelter.name }
-        let id = messages.startConversation(shelterID: pet.shelterID, shelterName: shelterName, pet: pet)
-        router.push(.conversation(id))
+    /// Shown instead of Apply/Message when you're looking at your own listing.
+    private var ownerControls: some View {
+        PFCard {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Label("This is your listing", systemImage: "person.crop.circle.badge.checkmark")
+                    .font(.pfHeadline)
+                    .foregroundStyle(Color.pfTextPrimary)
+                Text("This is how adopters see \(pet.name). Update the details, photos, or status any time.")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.pfTextSecondary)
+                PFButton(title: "Edit listing") { router.push(.editListing(pet.id)) }
+                PFButton(title: "Applications received", style: .secondary) { router.push(.receivedApplications) }
+            }
+        }
     }
 
-    /// Shown when a saved pet was adopted or removed from Petfinder.
+    private func openChat() {
+        guard let me = auth.user else {
+            router.showSignIn = true
+            return
+        }
+        isOpeningChat = true
+        let myName = profileStore.profile.displayName.isEmpty ? (me.displayName ?? "") : profileStore.profile.displayName
+        Task {
+            defer { isOpeningChat = false }
+            do {
+                let id = try await messages.openChat(about: pet, listerName: listerName, as: me, displayName: myName)
+                router.push(.conversation(id))
+            } catch {
+                chatError = error.localizedDescription
+            }
+        }
+    }
+
+    /// Shown when a saved pet was adopted or removed, or has an adoption pending.
     @ViewBuilder
     private var statusBanner: some View {
         let favorite = favorites.favorite(for: pet.id)
         if favorite?.isListed == false {
-            banner("This listing was removed from Petfinder. It may have been adopted.", color: .pfError)
+            banner("This listing was removed by the lister. The pet may have been adopted.", color: .pfError)
         } else if (favorite?.pet ?? pet).isAdopted {
             banner("\(pet.name) has been adopted!", color: .pfSuccess)
+        } else if pet.isPending {
+            banner("Adoption pending: an application has been approved. Ask the lister if they're still looking.", color: .pfBrandPrimary)
         }
     }
 
@@ -210,13 +265,8 @@ struct PetDetailView: View {
                         .font(.subheadline.weight(.semibold))
                     }
                 } else {
-                    Text("The shelter hasn't added a description yet.")
+                    Text("The lister hasn't added a description yet.")
                         .foregroundStyle(Color.pfTextSecondary)
-                }
-                // Petfinder only sends a short preview of the description.
-                if let webURL = pet.webURL {
-                    Link("View full listing on Petfinder", destination: webURL)
-                        .font(.subheadline)
                 }
             }
         }
@@ -230,12 +280,48 @@ struct PetDetailView: View {
                     yesNoRow("Good with dogs", pet.goodWithDogs)
                     yesNoRow("Good with cats", pet.goodWithCats)
                     yesNoRow("House-trained", pet.houseTrained)
+                    yesNoRow("Vaccinated", pet.vaccinated)
+                    yesNoRow("Spayed or neutered", pet.spayedNeutered)
+                    yesNoRow("Microchipped", pet.microchipped)
+                    factRow("Adoption fee", pet.feeText)
+                    factRow("Exact age", pet.ageDetail)
+                    factRow("Colors", pet.colors)
+                    factRow("Coat", pet.coat)
+                    factRow("Weight", pet.weight)
                     if pet.specialNeeds {
-                        Label("Has special needs. Ask the shelter for details.", systemImage: "heart.text.square")
-                            .foregroundStyle(Color.pfTextPrimary)
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
+                            Label("Has special needs", systemImage: "heart.text.square")
+                                .foregroundStyle(Color.pfTextPrimary)
+                            if let notes = pet.specialNeedsNotes {
+                                Text(notes)
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.pfTextSecondary)
+                            }
+                        }
+                    }
+                    if let health = pet.healthNotes {
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
+                            Text("Health notes").font(.subheadline.weight(.semibold))
+                            Text(health)
+                                .font(.subheadline)
+                                .foregroundStyle(Color.pfTextSecondary)
+                        }
                     }
                 }
             }
+        }
+    }
+
+    /// A label and a value, left out when there's no value.
+    @ViewBuilder
+    private func factRow(_ title: String, _ value: String?) -> some View {
+        if let value, !value.isEmpty {
+            HStack {
+                Text(title).foregroundStyle(Color.pfTextPrimary)
+                Spacer()
+                Text(value).foregroundStyle(Color.pfTextSecondary)
+            }
+            .font(.subheadline)
         }
     }
 
@@ -289,4 +375,5 @@ struct PetDetailView: View {
     .environment(ApplicationsStore())
     .environment(Router())
     .environment(MessagesStore())
+    .environment(ListingsService())
 }

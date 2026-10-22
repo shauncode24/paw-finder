@@ -69,7 +69,7 @@ struct OnboardingView: View {
             VStack(alignment: .leading, spacing: Spacing.md) {
                 feature("magnifyingglass", "Browse adoptable pets near you")
                 feature("heart", "Save favorites and get told when they're adopted")
-                feature("map", "Find shelters and follow them for new arrivals")
+                feature("map", "Follow listers near you and hear about new pets")
             }
             .padding(.horizontal, Spacing.lg)
             Spacer()
@@ -113,11 +113,11 @@ struct OnboardingView: View {
                 .font(.system(size: 80))
                 .foregroundStyle(Color.pfBrandPrimary)
                 .accessibilityHidden(true)
-            Text("Show pets and shelters near you?")
+            Text("Show pets and listers near you?")
                 .font(.pfTitle)
                 .foregroundStyle(Color.pfTextPrimary)
                 .multilineTextAlignment(.center)
-            Text("We only use your location while you're using the app, to sort pets and shelters by distance. You can always type a ZIP code instead.")
+            Text("We only use your location while you're using the app, to sort pets and listers by distance. You can always type a postcode instead.")
                 .foregroundStyle(Color.pfTextSecondary)
                 .multilineTextAlignment(.center)
             Spacer()

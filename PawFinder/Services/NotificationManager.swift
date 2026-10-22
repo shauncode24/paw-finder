@@ -16,7 +16,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     /// Set by the app so notification taps can navigate.
     @ObservationIgnored var onOpenURL: ((URL) -> Void)?
     /// The chat on screen right now; its message notifications aren't shown.
-    @ObservationIgnored var openConversationID: UUID?
+    @ObservationIgnored var openConversationID: String?
 
     /// When set, the app shows the "turn on notifications?" explanation sheet.
     var primingCategory: NotificationPreferences.Category?
@@ -99,21 +99,28 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     /// One notification per favorite whose status changed.
     func notifyStatusChanges(_ favorites: [FavoritePet]) async {
         for favorite in favorites {
-            await deliver(.favorites, id: "status-\(favorite.id)",
-                          title: "Update on \(favorite.pet.name)",
-                          body: favorite.isListed && favorite.pet.isAdopted
-                              ? "\(favorite.pet.name) has been adopted!"
-                              : "\(favorite.pet.name)'s listing was removed. They may have found a home.",
+            let name = favorite.pet.name
+            let body: String
+            if !favorite.isListed {
+                body = "\(name)'s listing was removed. They may have found a home."
+            } else if favorite.pet.isAdopted {
+                body = "\(name) has been adopted!"
+            } else if favorite.pet.isPending {
+                body = "\(name) now has an adoption pending."
+            } else {
+                body = "\(name) is available again."
+            }
+            await deliver(.favorites, id: "status-\(favorite.id)", title: "Update on \(name)", body: body,
                           link: "pawfinder://pet/\(favorite.id)")
         }
     }
 
-    /// "3 new pets at Austin Animal Center" for each followed shelter with new listings.
+    /// "3 new pets from Sunny Paws Rescue" for each followed lister with new listings.
     func notifyNewArrivals(_ arrivals: [FollowedSheltersStore.NewArrivals]) async {
         for arrival in arrivals {
             let count = arrival.pets.count
             await deliver(.shelters, id: "arrivals-\(arrival.shelter.id)",
-                          title: count == 1 ? "New pet at \(arrival.shelter.name)" : "\(count) new pets at \(arrival.shelter.name)",
+                          title: count == 1 ? "New pet from \(arrival.shelter.name)" : "\(count) new pets from \(arrival.shelter.name)",
                           body: Self.nameList(arrival.pets) + " just arrived.",
                           link: "pawfinder://shelter/\(arrival.shelter.id)")
         }
@@ -130,42 +137,28 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
     }
 
-    /// Schedules a notification for each planned (simulated) shelter reply.
-    func scheduleApplicationUpdates(_ application: AdoptionApplication) async {
-        for event in application.scheduledEvents {
-            await deliver(.applications, id: Self.applicationNotificationID(application.id, event.status),
-                          title: "\(application.pet.name): \(event.status.rawValue)",
-                          body: event.note ?? event.status.explanation,
-                          link: "pawfinder://application/\(application.id.uuidString)",
-                          at: event.date)
-        }
+    /// An adopter's application was updated by the lister ("Luna: Interview").
+    func notifyApplicationUpdate(applicationID: UUID, petName: String, status: ApplicationStatus, note: String?) async {
+        await deliver(.applications, id: "application-\(applicationID.uuidString)-\(status.rawValue)",
+                      title: "\(petName): \(status.rawValue)",
+                      body: note ?? status.explanation,
+                      link: "pawfinder://application/\(applicationID.uuidString)")
     }
 
-    func cancelApplicationUpdates(_ applicationID: UUID) {
-        center.removePendingNotificationRequests(
-            withIdentifiers: ApplicationStatus.allCases.map { Self.applicationNotificationID(applicationID, $0) }
-        )
+    /// A lister received a new application.
+    func notifyNewApplication(applicationID: String, petName: String, applicantName: String) async {
+        await deliver(.applications, id: "received-\(applicationID)",
+                      title: "New application for \(petName)",
+                      body: "\(applicantName) would like to adopt \(petName).",
+                      link: "pawfinder://received/\(applicationID)")
     }
 
-    func cancelApplicationUpdate(_ applicationID: UUID, status: ApplicationStatus) {
-        center.removePendingNotificationRequests(withIdentifiers: [Self.applicationNotificationID(applicationID, status)])
-    }
-
-    private static func applicationNotificationID(_ id: UUID, _ status: ApplicationStatus) -> String {
-        "application-\(id.uuidString)-\(status.rawValue)"
-    }
-
-    /// Notification for a simulated shelter reply, shown if you're not in that chat.
-    /// One pending notification per chat: a newer reply replaces it.
-    func scheduleMessageReply(_ reply: ScheduledReply, in conversation: Conversation) async {
-        await deliver(.messages, id: "message-\(conversation.id.uuidString)",
-                      title: conversation.shelterName, body: reply.text,
-                      link: "pawfinder://conversation/\(conversation.id.uuidString)",
-                      at: reply.date, extraInfo: ["conversationID": conversation.id.uuidString])
-    }
-
-    func cancelMessageNotifications(for conversationID: UUID) {
-        center.removePendingNotificationRequests(withIdentifiers: ["message-\(conversationID.uuidString)"])
+    /// A chat message arrived from the other person.
+    func notifyIncomingMessage(conversationID: String, from sender: String, about petName: String, text: String) async {
+        await deliver(.messages, id: "message-\(conversationID)",
+                      title: sender, body: text.isEmpty ? "Sent you a message about \(petName)." : text,
+                      link: "pawfinder://conversation/\(conversationID)",
+                      extraInfo: ["conversationID": conversationID])
     }
 
     /// From Settings, to check everything works. Ignores quiet hours.
@@ -200,7 +193,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     ) {
         let conversationID = notification.request.content.userInfo["conversationID"] as? String
         Task { @MainActor in
-            let isOpenChat = conversationID != nil && conversationID == openConversationID?.uuidString
+            let isOpenChat = conversationID != nil && conversationID == openConversationID
             completionHandler(isOpenChat ? [] : [.banner, .sound])
         }
     }

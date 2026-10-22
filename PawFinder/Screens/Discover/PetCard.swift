@@ -1,14 +1,14 @@
 import SwiftUI
 
 /// A pet's photo, or a paw placeholder while loading / when there's no photo.
-/// Images are cached by URLCache (set up in PawFinderApp).
+/// Photos are loaded and cached by `PhotoLoader`.
 struct PetPhoto: View {
     let url: URL?
     var species = "Dog"
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            if let image = phase.image {
+        RemoteImage(url: url) { phase in
+            if case .success(let image) = phase {
                 image
                     .resizable()
                     .scaledToFill()
@@ -118,7 +118,7 @@ struct PetRow: View {
 /// Grey placeholder card shown while the first page loads.
 struct SkeletonPetCard: View {
     var body: some View {
-        PetCard(pet: MockPetRepository.samplePets[0], showsFavoriteButton: false)
+        PetCard(pet: Pet.placeholder, showsFavoriteButton: false)
             .redacted(reason: .placeholder)
             .shimmering()
             .accessibilityLabel("Loading")
@@ -128,7 +128,7 @@ struct SkeletonPetCard: View {
 /// Grey placeholder row for the list layout.
 struct SkeletonPetRow: View {
     var body: some View {
-        PetRow(pet: MockPetRepository.samplePets[0], showsFavoriteButton: false)
+        PetRow(pet: Pet.placeholder, showsFavoriteButton: false)
             .redacted(reason: .placeholder)
             .shimmering()
             .accessibilityLabel("Loading")

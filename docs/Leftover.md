@@ -4,7 +4,22 @@ Things from SPEC.md that are still left out or simplified, to keep PawFinder a m
 
 Each item notes **what we did instead** and **how to add it later**. Items that have been picked up since are listed at the bottom under **Done in the scope bump**.
 
-**Ground rules for now:** no server in the middle, no cloud (Firebase Auth for sign-in is the one exception), and no tests. Items that need any of these are marked *(server)*, *(cloud)*, or *(tests)*.
+**Ground rules for now:** no server to run, no paid plan, and no tests. Since the move to user-posted listings (see [Listers-and-Messaging.md](Listers-and-Messaging.md)), **Firebase Authentication and Firestore are in use** (free Spark plan). Items that need a server or a paid plan are marked *(server)*, *(paid)*, or *(tests)*; older *(cloud)* marks mean "needed Firebase", which is now partly available.
+
+> ### Update: what the move to listers and real chat changed
+> **No longer applies (done, or the thing it described is gone):**
+> - Phase 1: the **Petfinder** client, OAuth token handling, retry/backoff, offline page cache, API proxy *(server)*, RescueGroups provider, and the saved-JSON fixtures. There is no external pet API any more. Firestore's own offline copy replaces the cache.
+> - Phase 3: the "Petfinder only sends a short description" limitation, and "Report listing saved on the device only" (reports now go to Firestore `reports`).
+> - Phase 9: the **simulated shelter** and "Cloud Function for status changes" (listers now review applications themselves; no function needed).
+> - Phase 10: the **simulated shelter replies**, the local outbox, and "real-time chat with real shelters" (now real, via Firestore listeners).
+>
+> **Still open, or newly relevant:**
+> - **Remote push** for chat/applications when the app is closed *(server, paid)*: needs Cloud Functions + APNs.
+> - **Favorites/collections/followed listers don't sync across devices** (Phase 8 is still skipped).
+> - **Application attachments aren't uploaded** (kept on the adopter's phone on purpose).
+> - Distances are in **miles**; add a km/mi setting for non-US users.
+> - Security rules are "good enough" for a class project, not hardened (see Listers-and-Messaging.md §14).
+> - A moderator tool for `reports`, and verified-rescue badges, are ideas listed in Listers-and-Messaging.md §13.
 
 ---
 

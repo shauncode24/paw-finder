@@ -8,9 +8,9 @@ struct FollowedSheltersView: View {
     var body: some View {
         Group {
             if followed.shelters.isEmpty {
-                EmptyStateView(icon: "star", title: "Not following any shelters",
-                               message: "Follow a shelter from its page to hear about new pets there.",
-                               buttonTitle: "Find shelters") { router.selectedTab = .map }
+                EmptyStateView(icon: "star", title: "Not following anyone yet",
+                               message: "Follow a lister from their page to hear about new pets they post.",
+                               buttonTitle: "Browse pets") { router.selectedTab = .map }
             } else {
                 List {
                     Section {
@@ -41,6 +41,6 @@ struct FollowedSheltersView: View {
             }
         }
         .background(Color.pfBackground)
-        .navigationTitle("Followed shelters")
+        .navigationTitle("Listers I follow")
     }
 }

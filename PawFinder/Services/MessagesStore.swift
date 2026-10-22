@@ -1,252 +1,211 @@
-import UIKit
+import FirebaseAuth
+import FirebaseCore
+import FirebaseFirestore
+import Foundation
 
-/// Chats with shelters, saved on the device (Documents/messages.json, photos
-/// in Documents/MessageFiles/).
+/// Real chat between adopters and listers, over Firestore.
 ///
-/// There's no real shelter on the other end, so a **simulated shelter** reads
-/// your message a few seconds later, "types", and replies with an answer
-/// based on what you asked. Replies are planned when you send
-/// (`pendingReplies`), so they still arrive if you leave the app, with a
-/// local notification.
+/// How it behaves like a socket: `addSnapshotListener` keeps a live connection
+/// open to Firestore, so a message sent from one phone shows up on the other
+/// within a moment, with no polling. Writes made offline are queued by Firestore
+/// and delivered automatically when the phone reconnects (the "outbox").
+///
+/// Listeners only run while the app is open. When it's closed, `backgroundCheck()`
+/// (run by iOS's background refresh) looks for new messages and posts a local
+/// notification. Instant push to a closed app would need a server (Cloud
+/// Functions); see docs/Listers-and-Messaging.md.
 @MainActor
 @Observable
 final class MessagesStore {
     private(set) var conversations: [Conversation] = []
+    private(set) var isLoaded = false
+    private(set) var userID: String?
 
-    private let fileURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("messages.json")
-
-    init() {
-        load()
-        refresh()
-    }
-
+    /// Messages waiting for me, across all chats (not counting blocked ones).
     var unreadCount: Int {
-        conversations.filter { !$0.isBlocked }.map(\.unreadCount).reduce(0, +)
+        guard let userID else { return 0 }
+        return conversations.filter { !$0.isBlocked }.map { $0.unreadCount(for: userID) }.reduce(0, +)
     }
 
-    func conversation(_ id: UUID) -> Conversation? {
+    @ObservationIgnored private var listener: ListenerRegistration?
+    @ObservationIgnored private let notifiedKey = "lastNotifiedMessageTimes"
+
+    private var isConfigured: Bool { FirebaseApp.app() != nil }
+    private var db: Firestore { Firestore.firestore() }
+
+    // MARK: - Listening
+
+    /// Call whenever the signed-in user changes (nil = signed out).
+    func start(for uid: String?) {
+        guard uid != userID else { return }
+        listener?.remove()
+        listener = nil
+        conversations = []
+        isLoaded = false
+        userID = uid
+
+        guard isConfigured, let uid else { return }
+        listener = db.collection("conversations")
+            .whereField("participants", arrayContains: uid)
+            .addSnapshotListener { [weak self] snapshot, error in
+                if let error { Log.network.error("Chats listener: \(error.localizedDescription)") }
+                Task { @MainActor in self?.handle(snapshot, uid: uid) }
+            }
+    }
+
+    private func handle(_ snapshot: QuerySnapshot?, uid: String) {
+        guard let snapshot, userID == uid else { return }
+
+        // New message from the other person while the app is open and that chat isn't on screen.
+        if isLoaded {
+            for change in snapshot.documentChanges where change.type != .removed {
+                guard !change.document.metadata.hasPendingWrites,
+                      let conversation = Conversation(id: change.document.documentID,
+                                                      data: change.document.data(with: .estimate)) else { continue }
+                notifyIfNew(conversation, me: uid)
+            }
+        }
+
+        conversations = snapshot.documents
+            .compactMap { Conversation(id: $0.documentID, data: $0.data(with: .estimate)) }
+            .sorted { $0.lastMessageAt > $1.lastMessageAt }
+        isLoaded = true
+    }
+
+    func conversation(_ id: String) -> Conversation? {
         conversations.first { $0.id == id }
     }
 
-    /// Finds or starts the chat with a shelter (about a pet, if given).
-    func startConversation(shelterID: String, shelterName: String, pet: Pet?) -> UUID {
-        if let existing = conversations.first(where: { $0.shelterID == shelterID && $0.pet?.id == pet?.id }) {
-            return existing.id
+    // MARK: - Starting a chat
+
+    /// Opens the chat about a pet, creating it the first time.
+    /// - Returns: the conversation ID.
+    func openConversation(listingID: String, listingName: String, listingSpecies: String,
+                          adopterID: String, adopterName: String,
+                          listerID: String, listerName: String) async throws -> String {
+        guard isConfigured else { throw APIError.notConfigured }
+        guard userID != nil else { throw APIError.notSignedIn }
+        guard adopterID != listerID else { throw BackendMessage(text: "You can't message yourself.") }
+
+        let id = Conversation.makeID(listingID: listingID, adopterID: adopterID)
+        let reference = db.collection("conversations").document(id)
+        do {
+            let existing = try await reference.getDocument()
+            if !existing.exists {
+                let conversation = Conversation(id: id, listingID: listingID, listingName: listingName,
+                                                listingSpecies: listingSpecies, adopterID: adopterID,
+                                                adopterName: adopterName, listerID: listerID, listerName: listerName)
+                // No `await`: offline, Firestore queues this and sends it later.
+                reference.setData(conversation.newDocumentData, completion: nil)
+            }
+        } catch {
+            throw backendError(error)
         }
-        var conversation = Conversation(shelterID: shelterID, shelterName: shelterName, pet: pet)
-        conversation.messages.append(Message(
-            sender: .system,
-            text: "You're chatting with \(shelterName). In this demo, the shelter's replies are simulated.",
-            date: .now, sentAt: .now
-        ))
-        conversations.insert(conversation, at: 0)
-        save()
-        return conversation.id
+        return id
     }
 
-    // MARK: - Sending
+    // MARK: - Sending and reading
 
-    /// Sends text and/or a photo. When offline, the message waits in the
-    /// outbox and goes out in `flushOutbox()`.
-    func send(text: String?, imageData: Data?, in id: UUID, isOnline: Bool) {
-        guard let index = index(of: id), !conversations[index].isBlocked else { return }
+    /// Sends a message. Never waits for the network: Firestore shows it
+    /// immediately as "pending" and delivers it when it can.
+    func send(text: String?, photo: Data?, in conversationID: String) {
+        guard let userID, let conversation = conversation(conversationID), !conversation.isBlocked else { return }
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let imageFile = imageData.flatMap(saveImage)
-        guard !(trimmed ?? "").isEmpty || imageFile != nil else { return }
+        let hasText = !(trimmed ?? "").isEmpty
+        guard hasText || photo != nil else { return }
 
-        let now = Date.now
-        let message = Message(sender: .me, text: trimmed?.isEmpty == false ? trimmed : nil,
-                              imageFile: imageFile, date: now, sentAt: isOnline ? now : nil)
-        conversations[index].messages.append(message)
-        if isOnline { planShelterResponse(to: message, at: index) }
-        moveToTop(index)
-        save()
+        let conversationRef = db.collection("conversations").document(conversationID)
+        let messageRef = conversationRef.collection("messages").document()
+
+        var message: [String: Any] = ["senderID": userID, "createdAt": FieldValue.serverTimestamp()]
+        if hasText, let trimmed { message["text"] = trimmed }
+        if let photo { message["image"] = photo.base64EncodedString() }
+
+        let other = conversation.otherID(for: userID)
+        let preview: String = hasText ? (trimmed ?? "") : "📷 Photo"
+
+        let batch = db.batch()
+        batch.setData(message, forDocument: messageRef)
+        batch.updateData([
+            "lastMessage": preview,
+            "lastMessageAt": FieldValue.serverTimestamp(),
+            "lastSenderID": userID,
+            "unread.\(other)": FieldValue.increment(Int64(1)),
+            "typing.\(userID)": FieldValue.delete(),
+        ], forDocument: conversationRef)
+        batch.commit(completion: nil)
     }
 
-    /// Sends everything that was written while offline.
-    func flushOutbox() {
-        var changed = false
-        for index in conversations.indices {
-            for messageIndex in conversations[index].messages.indices
-            where conversations[index].messages[messageIndex].sender == .me
-                && conversations[index].messages[messageIndex].sentAt == nil {
-                conversations[index].messages[messageIndex].sentAt = .now
-                planShelterResponse(to: conversations[index].messages[messageIndex], at: index)
-                changed = true
-            }
-        }
-        if changed { save() }
+    /// Tells the other person I've seen everything (this is what makes "Read" appear for them).
+    func markRead(_ conversationID: String) {
+        guard let userID, conversation(conversationID) != nil else { return }
+        db.collection("conversations").document(conversationID).updateData([
+            "unread.\(userID)": 0,
+            "lastRead.\(userID)": FieldValue.serverTimestamp(),
+        ], completion: nil)
     }
 
-    // MARK: - Reading, blocking, deleting
-
-    func markRead(_ id: UUID) {
-        guard let index = index(of: id), conversations[index].unreadCount > 0 else { return }
-        conversations[index].lastReadAt = .now
-        save()
+    /// Shows or clears "typing…" on the other person's screen.
+    func setTyping(_ isTyping: Bool, in conversationID: String) {
+        guard let userID else { return }
+        let value: Any = isTyping ? FieldValue.serverTimestamp() : FieldValue.delete()
+        db.collection("conversations").document(conversationID).updateData(["typing.\(userID)": value], completion: nil)
     }
 
-    func setBlocked(_ blocked: Bool, _ id: UUID) {
-        guard let index = index(of: id) else { return }
-        conversations[index].isBlocked = blocked
-        if blocked {
-            conversations[index].pendingReplies = []
-            NotificationManager.shared.cancelMessageNotifications(for: id)
-        }
-        save()
+    // MARK: - Safety
+
+    func setBlocked(_ blocked: Bool, _ conversationID: String) {
+        guard let userID else { return }
+        let change: Any = blocked ? FieldValue.arrayUnion([userID]) : FieldValue.arrayRemove([userID])
+        db.collection("conversations").document(conversationID).updateData(["blockedBy": change], completion: nil)
     }
 
-    /// Erase every chat (Settings › Erase all data).
-    func removeAll() {
-        conversations.map(\.id).forEach(delete)
+    /// Reports a chat (or one message in it). Saved in Firestore for a moderator to read.
+    func report(_ conversationID: String, reason: String, messageID: String? = nil) {
+        var data: [String: Any] = [
+            "type": "conversation",
+            "conversationID": conversationID,
+            "reason": reason,
+            "createdAt": FieldValue.serverTimestamp(),
+        ]
+        if let messageID { data["messageID"] = messageID }
+        if let userID { data["reporterID"] = userID }
+        db.collection("reports").addDocument(data: data, completion: nil)
     }
 
-    func delete(_ id: UUID) {
-        guard let conversation = conversation(id) else { return }
-        for file in conversation.messages.compactMap(\.imageFile) {
-            try? FileManager.default.removeItem(at: imageURL(for: file))
-        }
-        NotificationManager.shared.cancelMessageNotifications(for: id)
-        conversations.removeAll { $0.id == id }
-        save()
-    }
+    // MARK: - Notifications
 
-    /// Saves a report on the device (there's no moderation team to send it to yet).
-    func report(_ id: UUID, reason: String, messageID: UUID? = nil) {
-        var reports = UserDefaults.standard.stringArray(forKey: "messageReports") ?? []
-        reports.append("\(Date.now.ISO8601Format()) | conversation \(id) | message \(messageID?.uuidString ?? "-") | \(reason)")
-        UserDefaults.standard.set(reports, forKey: "messageReports")
-    }
+    /// Posts a notification once per new message from the other person.
+    private func notifyIfNew(_ conversation: Conversation, me: String) {
+        guard conversation.lastSenderID != me, conversation.lastSenderID != "",
+              conversation.unreadCount(for: me) > 0, !conversation.isBlocked else { return }
+        var seen = UserDefaults.standard.dictionary(forKey: notifiedKey) as? [String: Double] ?? [:]
+        let stamp = conversation.lastMessageAt.timeIntervalSince1970
+        guard stamp > (seen[conversation.id] ?? 0) else { return }
+        seen[conversation.id] = stamp
+        UserDefaults.standard.set(seen, forKey: notifiedKey)
 
-    func imageURL(for fileName: String) -> URL {
-        Self.filesFolder.appendingPathComponent(fileName)
-    }
-
-    // MARK: - Simulated shelter
-
-    /// Applies replies whose time has come. Called every second while a chat
-    /// is open, and when the app comes to the foreground.
-    func refresh(now: Date = .now) {
-        var changed = false
-        for index in conversations.indices where !conversations[index].isBlocked {
-            while let next = conversations[index].pendingReplies.first, next.date <= now {
-                conversations[index].pendingReplies.removeFirst()
-                conversations[index].messages.append(Message(sender: .shelter, text: next.text,
-                                                              date: next.date, sentAt: next.date))
-                changed = true
-            }
-        }
-        if changed {
-            conversations.sort { ($0.lastMessage?.date ?? $0.createdAt) > ($1.lastMessage?.date ?? $1.createdAt) }
-            save()
-        }
-    }
-
-    /// The shelter reads the message after ~3s and replies ~4s later.
-    /// Several quick messages in a row get a single reply.
-    private func planShelterResponse(to message: Message, at index: Int) {
-        guard let sentAt = message.sentAt,
-              let messageIndex = conversations[index].messages.firstIndex(where: { $0.id == message.id }) else { return }
-        conversations[index].messages[messageIndex].readAt = sentAt.addingTimeInterval(3)
-
-        let replyDate = sentAt.addingTimeInterval(7)
-        let text = Self.replyText(to: message, in: conversations[index])
-        conversations[index].pendingReplies.removeAll()   // answer the latest question only
-        let reply = ScheduledReply(date: replyDate, text: text)
-        conversations[index].pendingReplies.append(reply)
-
-        let conversation = conversations[index]
         Task {
-            await NotificationManager.shared.askPermission(for: .messages)
-            await NotificationManager.shared.scheduleMessageReply(reply, in: conversation)
+            await NotificationManager.shared.notifyIncomingMessage(
+                conversationID: conversation.id,
+                from: conversation.otherName(for: me),
+                about: conversation.listingName,
+                text: conversation.lastMessage
+            )
         }
     }
 
-    private static func replyText(to message: Message, in conversation: Conversation) -> String {
-        let petName = conversation.pet?.name ?? "our animals"
-        let pet = conversation.pet
-        guard let text = message.text?.lowercased() else {
-            return "Thanks for the photo! We'll take a look."
-        }
-        func has(_ words: String...) -> Bool { words.contains { text.contains($0) } }
-
-        if has("visit", "meet", "see ", "come by", "appointment") {
-            return "We'd love for you to meet \(petName)! Visits are during opening hours. What day works for you?"
-        }
-        if has("available", "still there", "adopted yet") {
-            return pet?.isAdopted == true
-                ? "\(petName) has found a home, but we have lots of other wonderful animals!"
-                : "Yes, \(petName) is still available as of today."
-        }
-        if has("fee", "cost", "price", "how much") {
-            return "The adoption fee covers vaccines, spay/neuter, and a microchip. We'll go over the amount when you visit. We never ask for payment before you meet the pet."
-        }
-        if has("kid", "child", "baby") {
-            return switch pet?.goodWithKids {
-            case true?: "\(petName) has done really well with kids here."
-            case false?: "\(petName) would do best in a home without young kids."
-            case nil: "We're not sure yet how \(petName) is with kids. We can arrange a meet-and-greet to see."
+    /// Run by iOS's background refresh: one quick look for messages that arrived
+    /// while the app was closed.
+    func backgroundCheck() async {
+        guard isConfigured, let uid = Auth.auth().currentUser?.uid else { return }
+        let snapshot = try? await db.collection("conversations")
+            .whereField("participants", arrayContains: uid)
+            .getDocuments()
+        for document in snapshot?.documents ?? [] {
+            if let conversation = Conversation(id: document.documentID, data: document.data(with: .estimate)) {
+                notifyIfNew(conversation, me: uid)
             }
-        }
-        if has("dog") {
-            return pet?.goodWithDogs == true ? "\(petName) gets along with other dogs." : "We'd suggest a careful introduction with your dog during a visit."
-        }
-        if has("cat") {
-            return pet?.goodWithCats == true ? "\(petName) has lived with cats." : "We haven't tested \(petName) with cats yet. A slow introduction would be best."
-        }
-        if has("apply", "application") {
-            return "You can apply right in the app: tap \"Apply to adopt\" on \(petName)'s page."
-        }
-        if has("health", "vaccin", "vet", "medical") {
-            return "\(petName) has had a vet check and is up to date on vaccines. We'll share the full records when you visit."
-        }
-        if has("thank") {
-            return "You're welcome! Let us know if you have any other questions."
-        }
-        return "Thanks for your message! Feel free to ask anything about \(petName): temperament, health, visits, or how adoption works."
-    }
-
-    // MARK: - Storage
-
-    private static var filesFolder: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("MessageFiles", isDirectory: true)
-    }
-
-    private func saveImage(_ data: Data) -> String? {
-        guard let image = UIImage(data: data), let jpeg = image.jpegData(compressionQuality: 0.7) else { return nil }
-        let fileName = "\(UUID().uuidString).jpg"
-        do {
-            try FileManager.default.createDirectory(at: Self.filesFolder, withIntermediateDirectories: true)
-            try jpeg.write(to: imageURL(for: fileName), options: .atomic)
-            return fileName
-        } catch {
-            Log.storage.error("Couldn't save message photo: \(error.localizedDescription)")
-            return nil
-        }
-    }
-
-    private func index(of id: UUID) -> Int? {
-        conversations.firstIndex { $0.id == id }
-    }
-
-    private func moveToTop(_ index: Int) {
-        let conversation = conversations.remove(at: index)
-        conversations.insert(conversation, at: 0)
-    }
-
-    private func load() {
-        guard let data = try? Data(contentsOf: fileURL),
-              let saved = try? JSONDecoder().decode([Conversation].self, from: data) else { return }
-        conversations = saved
-    }
-
-    private func save() {
-        do {
-            try JSONEncoder().encode(conversations).write(to: fileURL, options: .atomic)
-        } catch {
-            Log.storage.error("Couldn't save messages: \(error.localizedDescription)")
         }
     }
 }

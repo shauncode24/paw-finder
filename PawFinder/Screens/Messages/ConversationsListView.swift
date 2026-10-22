@@ -1,27 +1,32 @@
 import SwiftUI
 
-/// Profile › Messages: all chats with shelters, newest first.
+/// Profile › Messages: every chat you're in, as an adopter or a lister, newest first.
 struct ConversationsListView: View {
     @Environment(MessagesStore.self) private var store
+    @Environment(AuthManager.self) private var auth
     @Environment(Router.self) private var router
 
     var body: some View {
         Group {
-            if store.conversations.isEmpty {
-                EmptyStateView(icon: "bubble.left.and.bubble.right", title: "No messages yet",
-                               message: "Have a question about a pet? Tap \"Message shelter\" on their page.",
-                               buttonTitle: "Find a pet") { router.selectedTab = .discover }
+            if auth.user == nil {
+                EmptyStateView(icon: "bubble.left.and.bubble.right", title: "Sign in to chat",
+                               message: "Messages are between you and the person listing a pet, so you need an account.",
+                               buttonTitle: "Sign in") { router.showSignIn = true }
+            } else if store.conversations.isEmpty {
+                if store.isLoaded {
+                    EmptyStateView(icon: "bubble.left.and.bubble.right", title: "No messages yet",
+                                   message: "Have a question about a pet? Tap \"Message\" on their page. Messages from adopters about your listings show up here too.",
+                                   buttonTitle: "Find a pet") { router.selectedTab = .discover }
+                } else {
+                    LoadingView(message: "Loading messages...")
+                }
             } else {
                 List {
                     ForEach(store.conversations) { conversation in
                         NavigationLink(value: Route.conversation(conversation.id)) {
-                            ConversationRow(conversation: conversation)
+                            ConversationRow(conversation: conversation, me: store.userID ?? "")
                         }
                         .listRowBackground(Color.pfSurface)
-                    }
-                    .onDelete { offsets in
-                        let ids = offsets.map { store.conversations[$0].id }
-                        ids.forEach(store.delete)
                     }
                 }
                 .scrollContentBackground(.hidden)
@@ -29,66 +34,53 @@ struct ConversationsListView: View {
         }
         .background(Color.pfBackground)
         .navigationTitle("Messages")
-        // Pick up simulated replies while the list is open.
-        .task {
-            while !Task.isCancelled {
-                store.refresh()
-                try? await Task.sleep(for: .seconds(2))
-            }
-        }
     }
 }
 
 private struct ConversationRow: View {
     let conversation: Conversation
+    let me: String
 
     var body: some View {
+        let unread = conversation.unreadCount(for: me)
         HStack(spacing: Spacing.md) {
-            Group {
-                if let pet = conversation.pet {
-                    Color.clear.overlay { PetPhoto(url: pet.thumbnailURL, species: pet.species) }
-                } else {
-                    Image(systemName: "house.fill")
-                        .foregroundStyle(Color.pfBrandLight)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.pfBrandDeep)
-                }
-            }
-            .frame(width: 52, height: 52)
-            .clipShape(Circle())
+            Color.clear
+                .frame(width: 52, height: 52)
+                .overlay { PetPhoto(url: PhotoURL.thumbnail(of: conversation.listingID), species: conversation.listingSpecies) }
+                .clipShape(Circle())
 
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack {
-                    Text(conversation.title)
+                    Text(conversation.otherName(for: me))
                         .font(.pfHeadline)
                         .foregroundStyle(Color.pfTextPrimary)
                         .lineLimit(1)
                     Spacer()
-                    if let date = conversation.lastMessage?.date {
-                        Text(date.formatted(.relative(presentation: .named)))
+                    if !conversation.lastMessage.isEmpty {
+                        Text(conversation.lastMessageAt.formatted(.relative(presentation: .named)))
                             .font(.pfCaption)
                             .foregroundStyle(Color.pfTextSecondary)
                     }
                 }
-                if let subtitle = conversation.subtitle {
-                    Text(subtitle)
-                        .font(.pfCaption)
-                        .foregroundStyle(Color.pfTextSecondary)
-                }
+                Text(conversation.subtitle(for: me))
+                    .font(.pfCaption)
+                    .foregroundStyle(Color.pfTextSecondary)
+                    .lineLimit(1)
                 HStack {
                     Text(preview)
                         .font(.subheadline)
-                        .foregroundStyle(conversation.unreadCount > 0 ? Color.pfTextPrimary : Color.pfTextSecondary)
+                        .foregroundStyle(unread > 0 ? Color.pfTextPrimary : Color.pfTextSecondary)
+                        .fontWeight(unread > 0 ? .semibold : .regular)
                         .lineLimit(1)
                     Spacer()
-                    if conversation.unreadCount > 0 {
-                        Text("\(conversation.unreadCount)")
+                    if unread > 0 {
+                        Text("\(unread)")
                             .font(.pfCaption.weight(.bold))
                             .foregroundStyle(Color.pfSurfaceElevated)
                             .padding(.horizontal, Spacing.sm)
                             .padding(.vertical, 2)
                             .background(Color.pfBrandPrimary, in: Capsule())
-                            .accessibilityLabel("\(conversation.unreadCount) unread")
+                            .accessibilityLabel("\(unread) unread")
                     }
                 }
             }
@@ -98,8 +90,7 @@ private struct ConversationRow: View {
 
     private var preview: String {
         if conversation.isBlocked { return "Blocked" }
-        guard let last = conversation.lastMessage else { return "" }
-        let prefix = last.sender == .me ? "You: " : ""
-        return prefix + (last.text ?? "📷 Photo")
+        if conversation.lastMessage.isEmpty { return "No messages yet" }
+        return conversation.lastSenderID == me ? "You: \(conversation.lastMessage)" : conversation.lastMessage
     }
 }

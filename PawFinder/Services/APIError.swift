@@ -1,8 +1,10 @@
 import Foundation
 
-/// Errors from the network layer, each with a message that's OK to show users.
+/// Errors from loading and saving shared data (listings, chats, applications),
+/// each with a message that's OK to show users.
 enum APIError: LocalizedError {
-    case missingKeys
+    case notConfigured          // Firebase isn't set up (no GoogleService-Info.plist)
+    case notSignedIn
     case offline
     case badRequest
     case unauthorized
@@ -14,11 +16,12 @@ enum APIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .missingKeys: "Add your Petfinder keys to Secrets.plist."
+        case .notConfigured: "PawFinder isn't connected to its backend yet. See docs/SETUP.md to set up Firebase."
+        case .notSignedIn: "Please sign in to do that."
         case .offline: "You're offline. Check your connection and try again."
-        case .badRequest: "Some filters aren't valid. Check the location (use a US ZIP code or \"City, ST\")."
-        case .unauthorized: "Couldn't sign in to Petfinder. Check your API key and secret."
-        case .notFound: "This pet couldn't be found. It may have been adopted."
+        case .badRequest: "That didn't work. Check the location (a ZIP code or \"City, ST\") and your filters."
+        case .unauthorized: "You don't have permission to do that. Try signing in again."
+        case .notFound: "This pet couldn't be found. It may have been adopted or removed."
         case .rateLimited: "Too many requests. Please wait a moment and try again."
         case .server(let code): "The server had a problem (\(code)). Please try again."
         case .decoding: "We got an unexpected response. Please try again."

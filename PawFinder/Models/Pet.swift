@@ -1,7 +1,7 @@
 import Foundation
 
-/// A pet as the app uses it. API responses are converted into this
-/// (see PetfinderModels.swift), so screens never deal with raw JSON.
+/// A pet as the app uses it. Listings stored in Firestore are converted into
+/// this (see ListingMapper), so screens never deal with raw documents.
 struct Pet: Identifiable, Hashable, Codable {
     let id: String
     let name: String
@@ -15,33 +15,51 @@ struct Pet: Identifiable, Hashable, Codable {
     let thumbnailURL: URL?       // small photo, for grids and rails
     let location: String         // "Austin, TX"
     var distance: Double?        // miles, only when searching near a location
-    let shelterID: String
+    let shelterID: String        // the lister's user ID (the person or group who posted the pet)
     let goodWithKids: Bool?      // nil = unknown
     let goodWithDogs: Bool?
     let goodWithCats: Bool?
     let houseTrained: Bool
     let specialNeeds: Bool
-    let tags: [String]
+    let tags: [String]           // temperament, e.g. "Playful"
     let publishedAt: Date?
-    let webURL: URL?             // the listing on petfinder.com
+    let webURL: URL?
 
-    // Added in Phase 3. Optional with defaults so older saved data still decodes.
+    // Everything below is optional with a default, so favorites saved by
+    // older versions of the app still decode.
     var primaryBreed: String? = nil   // "Beagle", used to find similar pets
     var contactEmail: String? = nil
     var contactPhone: String? = nil
-
-    // Added in Phase 4.
-    var status: String? = nil         // Petfinder: "adoptable", "adopted", "found"
-
-    // Added with the scope bump.
+    var status: String? = nil         // "adoptable", "pending", "adopted"
     var coat: String? = nil           // "Short", "Medium", "Long", "Wire", "Hairless", "Curly"
-    var videoEmbeds: [String]? = nil  // HTML <iframe> snippets from Petfinder
+
+    // Details a lister fills in.
+    var ageDetail: String? = nil      // "2 years 3 months"
+    var colors: String? = nil         // "Black and white"
+    var weight: String? = nil         // "12 kg"
+    var vaccinated: Bool? = nil
+    var spayedNeutered: Bool? = nil
+    var microchipped: Bool? = nil
+    var specialNeedsNotes: String? = nil
+    var healthNotes: String? = nil
+    var adoptionFee: Double? = nil    // 0 or nil = free
+    var listedBy: String? = nil       // the lister's name, e.g. "Sunny Paws Rescue"
+    var videoLink: URL? = nil
+    var latitude: Double? = nil
+    var longitude: Double? = nil
 
     var isAdopted: Bool { status?.lowercased() == "adopted" }
+    var isPending: Bool { status?.lowercased() == "pending" }
 
     /// "Young · Male · Medium", for list rows.
     var summary: String {
         [age, gender, size].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// "Free" or "$150".
+    var feeText: String {
+        guard let adoptionFee, adoptionFee > 0 else { return "Free" }
+        return adoptionFee.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD").precision(.fractionLength(0...2)))
     }
 }
 
@@ -50,10 +68,17 @@ struct PetPage {
     let pets: [Pet]
     let currentPage: Int
     let totalPages: Int
-    /// Set when these pets came from the offline cache instead of the network.
-    var cachedAt: Date? = nil
-    /// True when these are the built-in sample pets, not Petfinder's.
-    var isSample = false
 
     var hasMore: Bool { currentPage < totalPages }
+}
+
+extension Pet {
+    /// A stand-in used by loading skeletons and SwiftUI previews. It never
+    /// appears as real data.
+    static let placeholder = Pet(
+        id: "placeholder", name: "Loading name", species: "Dog", breed: "Loading breed", age: "Young",
+        gender: "Female", size: "Medium", description: nil, photoURLs: [], thumbnailURL: nil,
+        location: "City, ST", distance: nil, shelterID: "placeholder", goodWithKids: nil, goodWithDogs: nil,
+        goodWithCats: nil, houseTrained: true, specialNeeds: false, tags: [], publishedAt: nil, webURL: nil
+    )
 }

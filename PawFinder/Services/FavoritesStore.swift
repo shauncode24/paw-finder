@@ -216,9 +216,9 @@ final class FavoritesStore {
 
     /// Downloads the pet's small photo so it shows offline and in Spotlight.
     private func savePhoto(for pet: Pet) async {
-        guard let remoteURL = pet.thumbnailURL ?? pet.photoURLs.first else { return }
+        guard let remoteURL = pet.thumbnailURL ?? pet.photoURLs.first,
+              let data = await PhotoLoader.shared.data(for: remoteURL) else { return }
         do {
-            let (data, _) = try await URLSession.shared.data(from: remoteURL)
             try FileManager.default.createDirectory(at: Self.photosFolder, withIntermediateDirectories: true)
             let fileName = "\(pet.id).jpg"
             try data.write(to: Self.photosFolder.appendingPathComponent(fileName), options: .atomic)

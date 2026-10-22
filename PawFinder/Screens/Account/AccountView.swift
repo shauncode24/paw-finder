@@ -1,4 +1,5 @@
 import AuthenticationServices
+import FirebaseFirestore
 import SwiftUI
 
 /// Profile › Account: password reset, sign out, export data, delete account.
@@ -7,6 +8,7 @@ struct AccountView: View {
     @Environment(ProfileStore.self) private var profileStore
     @Environment(FavoritesStore.self) private var favorites
     @Environment(FollowedSheltersStore.self) private var followed
+    @Environment(ListingsService.self) private var listings
     @Environment(RecentlyViewedStore.self) private var recentlyViewed
     @Environment(\.dismiss) private var dismiss
 
@@ -51,7 +53,7 @@ struct AccountView: View {
             } header: {
                 Text("Your data")
             } footer: {
-                Text("A JSON file with your profile, favorites, collections, notes, followed shelters, and recently viewed pets.")
+                Text("A JSON file with your profile, favorites, collections, notes, followed listers, and recently viewed pets.")
             }
 
             Section {
@@ -95,6 +97,13 @@ struct AccountView: View {
         }
     }
 
+    /// Removes everything this account put online: its listings (with photos) and its public profile.
+    /// Chats and applications are kept, so the other person's history isn't broken.
+    private func deleteOnlineData(userID: String) async {
+        await listings.deleteAllMine()
+        try? await Firestore.firestore().collection("users").document(userID).delete()
+    }
+
     private func makeExport() {
         exportURL = try? DataExporter.makeFile(user: auth.user, profile: profileStore.profile, favorites: favorites,
                                                followed: followed, recentlyViewed: recentlyViewed)
@@ -123,7 +132,7 @@ struct AccountView: View {
         isDeleting = true
         defer { isDeleting = false; password = "" }
         do {
-            try await auth.deleteAccount(password: password)
+            try await auth.deleteAccount(password: password, beforeDelete: { await deleteOnlineData(userID: userID) })
             profileStore.deleteData(for: userID)
             dismiss()
         } catch {
@@ -136,7 +145,7 @@ struct AccountView: View {
         isDeleting = true
         defer { isDeleting = false }
         do {
-            try await auth.deleteAppleAccount(result, nonce: nonce)
+            try await auth.deleteAppleAccount(result, nonce: nonce, beforeDelete: { await deleteOnlineData(userID: userID) })
             profileStore.deleteData(for: userID)
             dismiss()
         } catch is CancellationError {

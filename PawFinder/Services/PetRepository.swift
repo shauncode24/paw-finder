@@ -1,93 +1,86 @@
+import CoreLocation
 import SwiftUI
 
-/// Where screens get pets from. Screens only know about this protocol, so
-/// we can swap real data for mock data without changing any UI code.
+/// Where screens get pets and listers from. Screens only know about this
+/// protocol, so the data source can change without touching any UI code.
 protocol PetRepository {
     func fetchPets(page: Int, filters: PetFilters) async throws -> PetPage
     func fetchPet(id: String) async throws -> Pet
-    /// All breed names for a species, for search suggestions.
+    /// Breed names for a species, for search suggestions.
     func fetchBreeds(for species: PetFilters.Species) async throws -> [String]
+    /// A lister's public profile.
     func fetchShelter(id: String) async throws -> Shelter
-    /// Shelters near a ZIP, "City, ST", or "lat,long", nearest first.
+    /// Listers with live listings near a place, nearest first.
+    /// `location` is a postcode, "City, ST", or "lat,long".
     func fetchShelters(near location: String, distance: Int, page: Int) async throws -> ShelterPage
 }
 
-/// Real data from Petfinder.
-struct RemotePetRepository: PetRepository {
-    let client: PetfinderClient
+/// The real thing: listings that real people posted, from Firestore.
+struct FirestoreListingsRepository: PetRepository {
+    let listings: ListingsService
     var pageSize = 20
 
     func fetchPets(page: Int, filters: PetFilters) async throws -> PetPage {
-        var query = filters.queryItems
-        query["status"] = "adoptable"
+        try await listings.waitUntilReady()
 
-        // The cache key leaves out page/limit, so each search has one saved first page.
-        let cacheKey = query
-        query["page"] = String(page)
-        query["limit"] = String(pageSize)
-
-        do {
-            let response: PetfinderAnimalsResponse = try await client.get("animals", query: query)
-            let pets = response.animals.map { $0.toPet() }
-            if page == 1 { PetCache.save(pets, for: cacheKey) }
-            return PetPage(
-                pets: pets,
-                currentPage: response.pagination.currentPage,
-                totalPages: response.pagination.totalPages
-            )
-        } catch APIError.offline where page == 1 {
-            // Offline: show the last saved results for this search, if any.
-            guard let cached = PetCache.load(for: cacheKey) else { throw APIError.offline }
-            return PetPage(pets: cached.pets, currentPage: 1, totalPages: 1, cachedAt: cached.savedAt)
+        // A location filter needs a position to measure from.
+        var origin: CLLocationCoordinate2D?
+        let place = filters.location.trimmingCharacters(in: .whitespaces)
+        if !place.isEmpty {
+            origin = await ShelterGeocoder.shared.coordinate(forLocationText: place)
+            if origin == nil { throw APIError.badRequest }
         }
+
+        let all = await listings.search(filters: filters, origin: origin)
+        let totalPages = max(1, Int((Double(all.count) / Double(pageSize)).rounded(.up)))
+        let start = (page - 1) * pageSize
+        let slice = start < all.count ? Array(all[start..<min(start + pageSize, all.count)]) : []
+        return PetPage(pets: slice, currentPage: page, totalPages: totalPages)
     }
 
     func fetchPet(id: String) async throws -> Pet {
-        let response: PetfinderAnimalResponse = try await client.get("animals/\(id)")
-        return response.animal.toPet()
+        try await listings.fetchListing(id: id)
     }
 
     func fetchBreeds(for species: PetFilters.Species) async throws -> [String] {
-        let response: PetfinderBreedsResponse = try await client.get("types/\(species.rawValue.lowercased())/breeds")
-        return response.breeds.map(\.name)
+        BreedCatalog.breeds(for: species)
     }
 
     func fetchShelter(id: String) async throws -> Shelter {
-        let response: PetfinderOrganizationResponse = try await client.get("organizations/\(id)")
-        return response.organization.toShelter()
+        try await ListerDirectory.shared.shelter(id: id)
     }
 
     func fetchShelters(near location: String, distance: Int, page: Int) async throws -> ShelterPage {
-        let query = [
-            "location": location,
-            "distance": String(distance),
-            "sort": "distance",
-            "limit": "25",   // each one needs geocoding, so keep pages small
-            "page": String(page),
-        ]
-        let response: PetfinderOrganizationsResponse = try await client.get("organizations", query: query)
-        return ShelterPage(
-            shelters: response.organizations.map { $0.toShelter() },
-            currentPage: response.pagination.currentPage,
-            totalPages: response.pagination.totalPages
-        )
-    }
-}
-
-/// Picks the real repository if Petfinder keys are filled in, otherwise mock data.
-enum PetRepositoryFactory {
-    static func make() -> PetRepository {
-        guard Secrets.hasPetfinderKeys else {
-            Log.app.info("No Petfinder keys in Secrets.plist, so the app is using mock data.")
-            return MockPetRepository()
+        try await listings.waitUntilReady()
+        guard let origin = await ShelterGeocoder.shared.coordinate(forLocationText: location) else {
+            throw APIError.badRequest
         }
-        let client = PetfinderClient(apiKey: Secrets.petfinderAPIKey, apiSecret: Secrets.petfinderAPISecret)
-        // Real data, with sample pets as a safety net if Petfinder is unreachable.
-        return FallbackPetRepository(primary: RemotePetRepository(client: client))
+        let here = CLLocation(latitude: origin.latitude, longitude: origin.longitude)
+
+        let ids = await listings.listerIDs()
+        let listers = await ListerDirectory.shared.shelters(ids: ids)
+
+        var nearby: [Shelter] = []
+        for lister in listers {
+            guard let latitude = lister.latitude, let longitude = lister.longitude else { continue }
+            let miles = CLLocation(latitude: latitude, longitude: longitude).distance(from: here) / 1609.34
+            guard miles <= Double(distance) else { continue }
+            var copy = lister
+            copy.distance = miles
+            nearby.append(copy)
+        }
+        nearby.sort { ($0.distance ?? .infinity) < ($1.distance ?? .infinity) }
+
+        let pageLength = 25
+        let totalPages = max(1, Int((Double(nearby.count) / Double(pageLength)).rounded(.up)))
+        let start = (page - 1) * pageLength
+        let slice = start < nearby.count ? Array(nearby[start..<min(start + pageLength, nearby.count)]) : []
+        return ShelterPage(shelters: slice, currentPage: page, totalPages: totalPages)
     }
 }
 
 extension EnvironmentValues {
     /// Use in views: `@Environment(\.petRepository) private var repository`
+    /// (Previews fall back to the small built-in sample repository.)
     @Entry var petRepository: PetRepository = MockPetRepository()
 }

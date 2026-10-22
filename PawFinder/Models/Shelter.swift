@@ -1,14 +1,14 @@
 import Foundation
 
-/// The shelter or rescue group that lists a pet ("organization" in Petfinder).
+/// The person or rescue group that lists pets (a "lister"). The id is their
+/// user ID. Built from their public profile in Firestore (see ListerProfile).
 struct Shelter: Identifiable, Hashable {
     let id: String
     let name: String
     let email: String?
     let phone: String?
-    let address: String          // "7201 Levander Loop, Austin, TX 78702"
+    let address: String          // optional street address; most individual listers leave it blank
     let website: URL?
-    let petfinderURL: URL?
 
     // Added in Phase 5. Defaults keep older call sites working.
     var city: String? = nil
@@ -21,6 +21,9 @@ struct Shelter: Identifiable, Hashable {
     var distance: Double? = nil  // miles, only when searching near a location
     var adoptionPolicy: String? = nil
     var adoptionURL: URL? = nil
+    var latitude: Double? = nil   // approximate (from the ZIP/city), set when the lister saves their profile
+    var longitude: Double? = nil
+    var isOrganization = false    // a rescue or shelter, rather than an individual
 
     /// What to send to the geocoder: the street address, or at least city/ZIP.
     var geocodeQuery: String {
@@ -38,7 +41,6 @@ struct ShelterPage {
     let shelters: [Shelter]
     let currentPage: Int
     let totalPages: Int
-    var isSample = false
 
     var hasMore: Bool { currentPage < totalPages }
 }

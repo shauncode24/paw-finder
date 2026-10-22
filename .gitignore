@@ -1,5 +1,4 @@
-# Keys (never commit)
-PawFinder/Config/Secrets.plist
+# Firebase config (never commit)
 GoogleService-Info.plist
 
 # Xcode

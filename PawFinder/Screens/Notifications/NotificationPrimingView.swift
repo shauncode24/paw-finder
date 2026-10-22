@@ -5,7 +5,6 @@ import SwiftUI
 /// "Not now" here doesn't use up the one-time system prompt.
 struct NotificationPrimingView: View {
     let category: NotificationPreferences.Category
-    @Environment(ApplicationsStore.self) private var applications
 
     var body: some View {
         VStack(spacing: Spacing.xl) {
@@ -44,7 +43,6 @@ struct NotificationPrimingView: View {
                 PFButton(title: "Turn on notifications") {
                     Task {
                         await NotificationManager.shared.acceptPriming()
-                        await applications.rescheduleNotifications()
                     }
                 }
                 Button("Not now") { NotificationManager.shared.declinePriming() }
@@ -60,10 +58,10 @@ struct NotificationPrimingView: View {
     private var headline: String {
         switch category {
         case .favorites: "We'll let you know if a pet you saved gets adopted."
-        case .shelters: "We'll tell you when shelters you follow list new pets."
+        case .shelters: "We'll tell you when listers you follow post new pets."
         case .savedSearches: "We'll tell you when new pets match your saved search."
-        case .applications: "We'll tell you as soon as the shelter updates your application."
-        case .messages: "We'll let you know when the shelter replies."
+        case .applications: "We'll tell you as soon as the lister updates your application."
+        case .messages: "We'll let you know when the lister replies."
         }
     }
 }

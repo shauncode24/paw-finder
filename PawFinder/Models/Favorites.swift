@@ -7,7 +7,7 @@ struct FavoritePet: Codable, Identifiable, Hashable {
     var note = ""
     /// Set when a refresh finds the pet was adopted or removed. Cleared when the user opens it.
     var statusChanged = false
-    /// False when Petfinder no longer has the listing.
+    /// False when the lister deleted the listing.
     var isListed = true
     /// File name of the saved photo in `FavoritesStore.photosFolder`, once downloaded.
     var localPhotoFile: String?

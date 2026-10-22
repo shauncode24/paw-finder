@@ -15,19 +15,23 @@ struct PawFinderApp: App {
     @State private var network = NetworkMonitor()
     @State private var savedSearches = SavedSearchesStore()
     @State private var careChecklists = CareChecklistStore()
+    @State private var listings: ListingsService
+    @State private var listerProfile = ListerProfileStore()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
-    private let petRepository = PetRepositoryFactory.make()
+    private let petRepository: PetRepository
 
     init() {
-        // Bigger shared cache so pet photos (loaded by AsyncImage) are kept
-        // in memory and on disk instead of re-downloaded while scrolling.
-        URLCache.shared = URLCache(memoryCapacity: 50_000_000, diskCapacity: 200_000_000)
-
-        // Accounts: only turns on if GoogleService-Info.plist is in the app.
+        // Firebase first: accounts, listings, chats, and applications all depend on it.
+        // It only turns on if GoogleService-Info.plist is in the app (see docs/SETUP.md).
         AuthManager.configureFirebase()
         _auth = State(initialValue: AuthManager())
+
+        // Listings are a live feed from Firestore; the repository the screens use reads from it.
+        let listingsService = ListingsService()
+        _listings = State(initialValue: listingsService)
+        petRepository = FirestoreListingsRepository(listings: listingsService)
 
         let router = Router()
         _router = State(initialValue: router)
@@ -43,9 +47,13 @@ struct PawFinderApp: App {
                 .fullScreenCover(isPresented: Binding(get: { !hasCompletedOnboarding }, set: { _ in })) {
                     OnboardingView { hasCompletedOnboarding = true }
                 }
-                // Load the right profile when someone signs in or out.
+                // Whoever signs in or out: load their profile, chats, applications, and listings.
                 .onChange(of: auth.user?.id, initial: true) { _, userID in
                     profileStore.switchUser(to: userID, suggestedName: auth.user?.displayName)
+                    messages.start(for: userID)
+                    applications.start(for: userID)
+                    listerProfile.start(for: userID)
+                    listings.startMine(for: userID)
                 }
                 .environment(router)
                 .environment(auth)
@@ -55,13 +63,11 @@ struct PawFinderApp: App {
                 .environment(network)
                 .environment(savedSearches)
                 .environment(careChecklists)
-                // The number on the app icon: unread messages, adopted favorites, new search matches.
+                .environment(listings)
+                .environment(listerProfile)
+                // The number on the app icon: unread messages, new applications, changed favorites, new search matches.
                 .onChange(of: badgeCount, initial: true) { _, count in
                     NotificationManager.shared.updateBadge(count)
-                }
-                // Send messages that were written offline.
-                .onChange(of: network.isOnline) { _, isOnline in
-                    if isOnline { messages.flushOutbox() }
                 }
                 .environment(recentlyViewed)
                 .environment(favorites)
@@ -85,23 +91,16 @@ struct PawFinderApp: App {
                 }
         }
         .onChange(of: scenePhase) { _, phase in
-            switch phase {
-            case .background: BackgroundRefresh.schedule()
-            case .active:
-                // Apply any simulated shelter replies that came due.
-                applications.refresh()
-                messages.refresh()
-            default: break
-            }
+            if phase == .background { BackgroundRefresh.schedule() }
         }
-        // iOS wakes the app in the background now and then: check favorites for
-        // adoptions and followed shelters for new pets.
+        // iOS wakes the app in the background now and then. Live listeners stop when the
+        // app is closed, so this is when we look for anything that happened meanwhile.
         .backgroundTask(.appRefresh(BackgroundRefresh.identifier)) {
-            await checkFavoritesInBackground()
+            await checkInBackground()
         }
     }
 
-    private func checkFavoritesInBackground() async {
+    private func checkInBackground() async {
         BackgroundRefresh.schedule()   // ask for the next one
         let changed = await favorites.refreshStatuses(using: petRepository, force: true)
         await NotificationManager.shared.notifyStatusChanges(changed)
@@ -109,12 +108,13 @@ struct PawFinderApp: App {
         await NotificationManager.shared.notifyNewArrivals(arrivals)
         let matches = await savedSearches.checkNewMatches(using: petRepository)
         await NotificationManager.shared.notifySavedSearchMatches(matches)
-        applications.refresh()
-        messages.refresh()
+        await messages.backgroundCheck()
+        await applications.backgroundCheck()
         NotificationManager.shared.updateBadge(badgeCount)
     }
 
     private var badgeCount: Int {
-        messages.unreadCount + favorites.favorites.filter(\.statusChanged).count + savedSearches.newMatchTotal
+        let changedFavorites = favorites.favorites.filter(\.statusChanged).count
+        return messages.unreadCount + applications.newReceivedCount + changedFavorites + savedSearches.newMatchTotal
     }
 }

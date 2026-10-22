@@ -1,8 +1,9 @@
 import MapKit
 import SwiftUI
 
-/// On the pet detail screen: the shelter's name, address, a small map,
-/// contact buttons, directions, and a link to the full shelter profile.
+/// On the pet detail screen: who's listing the pet, where they are (generally),
+/// contact buttons, and a link to their full profile. Individuals only show
+/// their city; a map and directions appear for rescues with a street address.
 struct ShelterCard: View {
     let state: PetDetailViewModel.ShelterState
     let coordinate: CLLocationCoordinate2D?
@@ -17,11 +18,11 @@ struct ShelterCard: View {
             case .loading:
                 HStack(spacing: Spacing.sm) {
                     ProgressView()
-                    Text("Loading shelter...").foregroundStyle(Color.pfTextSecondary)
+                    Text("Loading lister...").foregroundStyle(Color.pfTextSecondary)
                 }
             case .failed:
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text("Couldn't load the shelter.").foregroundStyle(Color.pfTextSecondary)
+                    Text("Couldn't load the lister's details.").foregroundStyle(Color.pfTextSecondary)
                     Button("Try again", action: retry)
                     // We can still show the pet's own contact details.
                     ContactButtons(phone: pet.contactPhone, email: pet.contactEmail, website: nil)
@@ -42,6 +43,10 @@ struct ShelterCard: View {
                     Text(shelter.address)
                         .font(.subheadline)
                         .foregroundStyle(Color.pfTextSecondary)
+                } else if !shelter.cityState.isEmpty {
+                    Label(shelter.cityState, systemImage: "mappin.and.ellipse")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.pfTextSecondary)
                 }
                 OpenStatusLabel(shelter: shelter)
                 if let distance = distanceInMiles {
@@ -51,7 +56,7 @@ struct ShelterCard: View {
                 }
             }
 
-            if let coordinate {
+            if let coordinate, !shelter.address.isEmpty {
                 ShelterMiniMap(name: shelter.name, coordinate: coordinate)
                 Link(destination: MapsLink.directions(name: shelter.name, coordinate: coordinate)) {
                     Label("Get directions", systemImage: "arrow.triangle.turn.up.right.diamond.fill")
@@ -61,11 +66,11 @@ struct ShelterCard: View {
 
             ContactButtons(phone: shelter.phone ?? pet.contactPhone,
                            email: shelter.email ?? pet.contactEmail,
-                           website: shelter.website ?? shelter.petfinderURL)
+                           website: shelter.website)
 
             NavigationLink(value: Route.shelter(id: shelter.id)) {
                 HStack {
-                    Text("View shelter and its pets")
+                    Text("See \(shelter.name)'s profile and other pets")
                     Spacer()
                     Image(systemName: "chevron.right")
                 }
@@ -75,7 +80,7 @@ struct ShelterCard: View {
         }
     }
 
-    /// Prefer the real distance from the user; fall back to Petfinder's search distance.
+    /// Prefer the real distance from the user; fall back to the distance from the search.
     private var distanceInMiles: Double? {
         if let userLocation, let coordinate {
             return userLocation.miles(to: coordinate)

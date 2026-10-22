@@ -81,8 +81,7 @@ struct SettingsView: View {
                     recentlyViewed.clear()
                     confirmation = "Recently viewed cleared."
                 }
-                Button("Clear saved search results and photos", role: .destructive) {
-                    PetCache.clear()
+                Button("Clear the picture cache", role: .destructive) {
                     URLCache.shared.removeAllCachedResponses()
                     confirmation = "Cache cleared."
                 }
@@ -106,15 +105,12 @@ struct SettingsView: View {
             Section {
                 Button("Erase all data on this phone", role: .destructive) { confirmErase = true }
             } footer: {
-                Text("Removes favorites, collections, applications, messages, saved searches, followed shelters, your profile, and cached pets from this phone. Your account (if any) isn't deleted.")
+                Text("Removes favorites, collections, application drafts and attachments, saved searches, followed listers, and your profile from this phone. Your account, your listings, and your chats stay online: delete those from Profile › Account.")
             }
 
             Section("About") {
                 LabeledContent("Version", value: appVersion)
-                LabeledContent("Pet data", value: Secrets.hasPetfinderKeys ? "Petfinder" : "Sample data (no API keys)")
-                if let url = URL(string: "https://www.petfinder.com") {
-                    Link("Pet listings powered by Petfinder", destination: url)
-                }
+                LabeledContent("Listings", value: "Posted by PawFinder users")
             }
         }
         .scrollContentBackground(.hidden)
@@ -138,17 +134,13 @@ struct SettingsView: View {
     private func eraseAll() {
         favorites.removeAll()
         applications.removeAll()
-        messages.removeAll()
         savedSearches.removeAll()
         followed.removeAll()
         recentlyViewed.clear()
         careChecklists.reset()
         profileStore.deleteData(for: profileStore.ownerID)
-        PetCache.clear()
         URLCache.shared.removeAllCachedResponses()
         UserDefaults.standard.removeObject(forKey: "swipePassedPetIDs")
-        UserDefaults.standard.removeObject(forKey: "listingReports")
-        UserDefaults.standard.removeObject(forKey: "messageReports")
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         NotificationManager.shared.updateBadge(0)
         confirmation = "All PawFinder data on this phone was erased."

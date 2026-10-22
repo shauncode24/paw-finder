@@ -29,19 +29,21 @@ enum SupportInfo {
 struct HelpView: View {
     private let faqs: [(String, String)] = [
         ("How does adopting through PawFinder work?",
-         "Find a pet you love, tap \"Apply to adopt\", and fill in the application. The shelter reviews it, may ask for a chat or meet-and-greet, and then lets you know their decision. You can follow every step under Profile › My applications."),
+         "Find a pet you love, tap \"Apply to adopt\", and fill in the application. The lister reviews it, may ask for a chat or meet-and-greet, and then lets you know their decision. You can follow every step under Profile › My applications."),
         ("Are the pets real?",
-         "With Petfinder connected, yes: listings come from real shelters and rescues. If Petfinder can't be reached, PawFinder shows sample pets (you'll see a banner) so you can still look around."),
+         "Yes. Every pet is listed by a real person or rescue using PawFinder, and shows up here the moment they post. Chat with the lister before applying, and never send money before meeting a pet in person."),
         ("Who answers my messages and applications?",
-         "In this version, shelter replies are simulated so you can try the whole journey. Real shelter messaging is planned."),
+         "The person or rescue who listed the pet. Tap \"Message\" on any pet's page to chat with them, and you'll be notified when they reply. Applications go to them too, and you can follow the status in My applications."),
         ("Why do I need an account?",
-         "You don't! You can browse, favorite, and apply as a guest. An account keeps your profile with you and is needed for a few things like deleting your data from our servers later."),
+         "You can browse and favorite pets as a guest. An account is needed to message a lister, apply to adopt, or list a pet, because those involve another real person."),
+        ("How do I list a pet for adoption?",
+         "Go to Profile › \"List a pet for adoption\". The first time, you set up a short lister profile (as an individual or a rescue). Then add the pet's photos and details. It's the same account you use to adopt, with no separate login. Manage your pets and the applications you receive from the same section."),
         ("How do I get told when a pet is adopted?",
          "Favorite the pet and turn on notifications. PawFinder checks now and then and lets you know if their status changes."),
         ("What does the breed match score mean?",
          "It compares each breed's typical traits with your lifestyle answers (home, kids, schedule, activity). It's a guide, not a rule: every pet is an individual, and many shelter pets are wonderful mixes."),
         ("Can I use PawFinder without location?",
-         "Yes. Type a ZIP code or city in Discover's filters or on the Map instead."),
+         "Yes. Type a postcode or city in Discover's filters or on the Map instead."),
         ("How do I delete my data?",
          "Settings › Erase all data on this phone removes everything stored on your device. To delete your account too, go to Profile › Account › Delete account."),
     ]
@@ -99,14 +101,13 @@ struct AboutView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.pfTextSecondary)
                 }
-                Text("PawFinder helps people find and adopt pets from shelters and rescues. Every adoption frees up space for another animal in need.")
+                Text("PawFinder connects people who have pets to rehome with people ready to adopt them. Every adoption frees up space for another animal in need.")
                     .multilineTextAlignment(.center)
                     .foregroundStyle(Color.pfTextPrimary)
 
                 PFCard {
                     VStack(alignment: .leading, spacing: Spacing.md) {
-                        credit("Pet listings", "Powered by Petfinder", url: "https://www.petfinder.com")
-                        credit("Sample photos", "placedog.net and cataas.com", url: nil)
+                        credit("Pet listings", "Posted by PawFinder users", url: nil)
                         credit("Maps", "Apple MapKit", url: nil)
                         credit("Accounts", "Firebase Authentication", url: nil)
                     }
@@ -173,11 +174,11 @@ struct LegalTextView: View {
         ("Your account",
          "If you create an account, your email (or username), name, and a secure password hash are stored by Firebase Authentication (Google) so you can sign in. You can delete your account at any time in Profile › Account."),
         ("Location",
-         "If you allow it, your location is used only while you use the app, to sort pets and shelters by distance. It's sent to Petfinder as part of a search and isn't stored by us."),
+         "If you allow it, your location is used only while you use the app, to sort pets and listers by distance. Listers also give an approximate location (a city or postcode) that's shown with their listings."),
         ("Photos",
          "Photos you add to applications or messages, and your profile photo, stay on your device."),
         ("Pet listings",
-         "Searches are sent to Petfinder to find pets and shelters. Petfinder's own privacy policy applies to that service."),
+         "Listings, lister profiles, chats, and applications are stored in Google Firebase (Firestore) so they can be shared between people. Listings and lister profiles are public. Chats are visible only to the two people in them, and applications only to the applicant and the lister."),
         ("Your choices",
          "You can export your data (Profile › Account › Export my data), erase everything on this phone (Settings), and turn notifications or location off at any time in iPhone Settings."),
         ("Contact",
@@ -186,15 +187,15 @@ struct LegalTextView: View {
 
     static let terms = LegalTextView(title: "Terms of Use", updated: "October 2026", sections: [
         ("Using PawFinder",
-         "PawFinder helps you find adoptable pets and contact shelters. Adoption decisions, fees, and policies are set by each shelter, not by PawFinder."),
+         "PawFinder helps you find adoptable pets and contact the people listing them. Adoption decisions, fees, and policies are set by each lister, not by PawFinder."),
         ("Listings",
-         "Pet and shelter information comes from the shelters (via Petfinder). We do our best to keep it current, but a pet may already be adopted or details may change."),
+         "Listings are written by the people and rescues who post them. PawFinder doesn't verify them. A pet may already be adopted or details may change, so ask the lister before you travel."),
         ("Be kind",
          "Don't send abusive messages, spam, or anything illegal. Never send money before meeting a pet in person; report any listing or message that asks you to."),
         ("Your account",
          "Keep your password safe. You can stop using PawFinder and delete your account at any time."),
         ("No guarantees",
-         "PawFinder is provided as is. We're not responsible for agreements between you and a shelter."),
+         "PawFinder is provided as is. We're not responsible for agreements between you and a lister."),
     ])
 }
 
