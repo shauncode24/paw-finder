@@ -20,6 +20,7 @@ struct PetFilters: Codable, Hashable {
     var distance = 50                // miles, only used with a location
     var sort: Sort = .newest
     var shelterID: String?           // only this lister's pets (lister profile)
+    var needsFoster: Bool?           // true = only pets that need a foster (nil keeps old saved filters readable)
 
     enum Species: String, Codable, CaseIterable {
         case dog = "Dog", cat = "Cat", rabbit = "Rabbit", bird = "Bird"
@@ -101,6 +102,7 @@ struct PetFilters: Codable, Hashable {
         count += coats.count
         count += [goodWithKids, goodWithDogs, goodWithCats, houseTrained, specialNeeds].filter { $0 }.count
         if listed != .any { count += 1 }
+        if needsFoster == true { count += 1 }
         if !location.isEmpty { count += 1 }
         return count
     }

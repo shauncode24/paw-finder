@@ -12,6 +12,7 @@ struct ProfileView: View {
     @Environment(FollowedSheltersStore.self) private var followed
     @Environment(ListerProfileStore.self) private var listerProfile
     @Environment(ListingsService.self) private var listings
+    @Environment(FosterStore.self) private var fosters
     @Environment(Router.self) private var router
     @State private var showAuth = false
 
@@ -33,6 +34,15 @@ struct ProfileView: View {
                 Text("Rehoming a pet?")
             } footer: {
                 Text("Anyone can list pets for adoption from their account, as an individual or a rescue.")
+            }
+            .listRowBackground(Color.pfSurface)
+
+            Section {
+                fosterRows
+            } header: {
+                Text("Fostering")
+            } footer: {
+                Text("Foster volunteers give a pet a safe home for a few days or weeks until they're adopted.")
             }
             .listRowBackground(Color.pfSurface)
 
@@ -140,6 +150,43 @@ struct ProfileView: View {
         }
         .scrollContentBackground(.hidden)
         .sheet(isPresented: $showAuth) { AuthSheet() }
+    }
+
+    /// Foster volunteer profile, offers, and (for listers) the volunteer directory.
+    @ViewBuilder
+    private var fosterRows: some View {
+        NavigationLink(value: Route.fosterProfile) {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Label(fosters.isFoster ? "Foster volunteer profile" : "Become a foster volunteer",
+                      systemImage: "house.and.flag")
+                if let profile = fosters.profile {
+                    Text(profile.isAvailable ? "Available · \(profile.cityState)" : "Paused")
+                        .font(.pfCaption)
+                        .foregroundStyle(Color.pfTextSecondary)
+                }
+            }
+        }
+        if auth.user != nil, fosters.isFoster || listerProfile.isLister || !fosters.offers.isEmpty {
+            NavigationLink(value: Route.fosterOffers) {
+                HStack {
+                    Label("Foster offers", systemImage: "tray.full")
+                    Spacer()
+                    if fosters.pendingReceivedCount > 0 {
+                        Text("\(fosters.pendingReceivedCount) new")
+                            .font(.pfCaption.weight(.bold))
+                            .foregroundStyle(Color.pfSurfaceElevated)
+                            .padding(.horizontal, Spacing.sm)
+                            .padding(.vertical, 2)
+                            .background(Color.pfBrandPrimary, in: Capsule())
+                    }
+                }
+            }
+        }
+        if listerProfile.isLister {
+            NavigationLink(value: Route.fosterDirectory) {
+                Label("Foster volunteers nearby", systemImage: "person.2.badge.gearshape")
+            }
+        }
     }
 
     /// Sign in → set up (first time) → my listings, applications received, add a listing.

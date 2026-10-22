@@ -34,6 +34,8 @@ Until Firebase is set up, Discover shows "Not connected yet". That's expected.
 3. That's it. There are **no indexes to create**; the app only uses simple queries.
 4. Run the app, sign in, and try **Profile › List a pet for adoption**.
 
+**Phases 17 to 20 are done, so [`firestore.rules`](../firestore.rules) is complete for everything the app does today.** Paste the whole file once and you're set.
+
 **Whenever `firestore.rules` changes** (it did for the Meet & Greet planner), paste the whole file into the Rules tab again and click **Publish**. Without the new rule, accepting or declining a meet-up fails quietly.
 
 Why the rules matter: they decide who can read and write what. Without them, either nothing works (default rules) or everything is open to anyone (test mode). What each rule does is explained in [Listers-and-Messaging.md](Listers-and-Messaging.md).

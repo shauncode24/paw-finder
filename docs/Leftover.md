@@ -272,7 +272,23 @@ The app always has something to show:
 | Happy tails for guests | Rules say signed-in only | Change the read rule to `if true` |
 | **Not compiled yet, rules untested** | Written on Windows | Expect small compile fixes |
 
-## Later phases (15 onwards, and 20)
+## Phase 20: Foster Volunteers
+
+**Built:** foster volunteer profile (city-level location, what you can take, how long); "Needs a foster" on listings with a badge, filter and banner; offers to foster that the lister accepts or declines; "In foster care with <name>" on the listing; a directory of volunteers (list and map) for listers with "Invite to foster"; notifications; rules. Details in Listers-and-Messaging.md §18.
+
+| Left out / simplified | Why | How to add it later |
+|---|---|---|
+| Background checks, foster agreements, documents | Not possible without a real vetting process | Out of scope |
+| Supplies, donations, stipends, vet-cost tracking | Out of scope | |
+| Clustering on the foster map | Few volunteers per area | Reuse `PetCluster` with a generic item type |
+| Auto-declining other offers after one is accepted | Kept manual | Add to `FosterStore.respond` |
+| A foster's own "My foster pets" screen | The pet's page and the offer show it | Query listings by `fosterByID` (needs an index) |
+| Ending a placement from the foster's side | The lister controls the listing | Rule branch for the foster |
+| Visible-to-listers check is "has a lister profile" | Anyone can become a lister | Admin-approved listers (Admin role was not selected) |
+| Reminder when a foster period ends | Needs dates on offers | Add start/end dates and a local reminder |
+| **Not compiled yet, rules untested** | Written on Windows | Expect small compile fixes |
+
+## Later phases (15 onwards)
 
 Not started yet. When a phase is built, anything left out or simplified gets added here under that phase's heading.
 

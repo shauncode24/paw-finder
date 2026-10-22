@@ -110,6 +110,12 @@ struct RouteView: View {
             ListerReviewsView(listerID: id, listerName: name)
         case .journey(let applicationID):
             JourneyView(applicationID: applicationID)
+        case .fosterProfile:
+            FosterProfileView()
+        case .fosterOffers:
+            FosterOffersView()
+        case .fosterDirectory:
+            FosterDirectoryView()
         case .designSystem:
             DesignSystemPreviewView()
         }

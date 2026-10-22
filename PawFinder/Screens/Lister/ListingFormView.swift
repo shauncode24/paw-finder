@@ -78,6 +78,7 @@ struct ListingFormView: View {
             homeSection
             healthSection
             adoptionSection
+            fosterSection
             locationSection
             if isEditing { statusSection }
 
@@ -230,6 +231,35 @@ struct ListingFormView: View {
             Text("Adoption")
         } footer: {
             Text("Never ask adopters to send money before meeting the pet in person.")
+        }
+    }
+
+    private var fosterSection: some View {
+        Section {
+            if !draft.fosterByName.isEmpty {
+                Label("In foster care with \(draft.fosterByName)", systemImage: "house.fill")
+                    .foregroundStyle(Color.pfTextPrimary)
+                Button("End foster placement", role: .destructive) {
+                    draft.fosterByID = ""
+                    draft.fosterByName = ""
+                }
+            } else {
+                Toggle("This pet needs a foster", isOn: $draft.fosterNeeded)
+                    .tint(Color.pfBrandPrimary)
+                if draft.fosterNeeded {
+                    TextField("Why? (optional)", text: $draft.fosterReason, axis: .vertical)
+                        .lineLimit(1...3)
+                    Picker("For how long", selection: $draft.fosterDuration) {
+                        ForEach(FosterDuration.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                }
+            }
+        } header: {
+            Text("Fostering")
+        } footer: {
+            Text(draft.fosterByName.isEmpty
+                 ? "Pets that need a foster get a badge in Discover, and you can invite foster volunteers nearby from Profile › Foster volunteers nearby."
+                 : "Shown on the listing until the pet is adopted. The volunteer's address is never shown.")
         }
     }
 

@@ -102,6 +102,14 @@ struct ListingDraft: Equatable {
     var videoLink = ""
     var status: ListingStatus = .available
 
+    // Fostering
+    var fosterNeeded = false
+    var fosterReason = ""
+    var fosterDuration: FosterDuration = .weeks
+    /// Set when a volunteer's offer was accepted; cleared to end the placement.
+    var fosterByID = ""
+    var fosterByName = ""
+
     // Where and how to reach the lister
     var city = ""
     var state = ""
@@ -222,6 +230,11 @@ enum ListingMapper {
         pet.videoLink = (d["videoLink"] as? String).flatMap(URL.init(string:))
         pet.latitude = d["latitude"] as? Double
         pet.longitude = d["longitude"] as? Double
+        pet.fosterNeeded = d["fosterNeeded"] as? Bool
+        pet.fosterReason = nonEmpty(d["fosterReason"] as? String)
+        pet.fosterDuration = nonEmpty(d["fosterDuration"] as? String)
+        pet.fosterByID = nonEmpty(d["fosterByID"] as? String)
+        pet.fosterByName = nonEmpty(d["fosterByName"] as? String)
         return pet
     }
 
@@ -266,6 +279,11 @@ enum ListingMapper {
         draft.postcode = (d["postcode"] as? String) ?? ""
         draft.contactEmail = (d["contactEmail"] as? String) ?? ""
         draft.contactPhone = (d["contactPhone"] as? String) ?? ""
+        draft.fosterNeeded = (d["fosterNeeded"] as? Bool) ?? false
+        draft.fosterReason = (d["fosterReason"] as? String) ?? ""
+        draft.fosterDuration = FosterDuration(rawValue: (d["fosterDuration"] as? String) ?? "") ?? .weeks
+        draft.fosterByID = (d["fosterByID"] as? String) ?? ""
+        draft.fosterByName = (d["fosterByName"] as? String) ?? ""
         return draft
     }
 
@@ -319,6 +337,17 @@ enum ListingMapper {
             d[key] = trimmed(value)
         }
         if let coat = draft.coat { d["coat"] = coat.rawValue }
+        // Fostering: "needs a foster" and "already with a foster" are mutually exclusive.
+        let fostered = !trimmed(draft.fosterByName).isEmpty
+        d["fosterNeeded"] = draft.fosterNeeded && !fostered
+        if draft.fosterNeeded && !fostered {
+            if !trimmed(draft.fosterReason).isEmpty { d["fosterReason"] = trimmed(draft.fosterReason) }
+            d["fosterDuration"] = draft.fosterDuration.rawValue
+        }
+        if fostered {
+            d["fosterByID"] = trimmed(draft.fosterByID)
+            d["fosterByName"] = trimmed(draft.fosterByName)
+        }
         // Yes/No answers; "Not sure" is simply left out.
         if let value = draft.goodWithKids.value { d["goodWithKids"] = value }
         if let value = draft.goodWithDogs.value { d["goodWithDogs"] = value }
@@ -369,6 +398,7 @@ extension PetFilters {
         if goodWithCats, pet.goodWithCats != true { return false }
         if houseTrained, !pet.houseTrained { return false }
         if specialNeeds, !pet.specialNeeds { return false }
+        if needsFoster == true, !pet.needsFoster { return false }
         if !coats.isEmpty, !coats.map(\.rawValue).contains(pet.coat ?? "") { return false }
         if let dateFilter = listed.dateFilter, let published = pet.publishedAt {
             if dateFilter.key == "after", published < dateFilter.date { return false }

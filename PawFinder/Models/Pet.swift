@@ -48,6 +48,16 @@ struct Pet: Identifiable, Hashable, Codable {
     var latitude: Double? = nil
     var longitude: Double? = nil
 
+    // Fostering. A pet either needs a foster, or is in foster care with someone.
+    var fosterNeeded: Bool? = nil
+    var fosterReason: String? = nil
+    var fosterDuration: String? = nil     // "A few weeks"
+    var fosterByID: String? = nil
+    var fosterByName: String? = nil       // the volunteer's public name only
+
+    var needsFoster: Bool { fosterNeeded == true && !isAdopted }
+    var isInFosterCare: Bool { !(fosterByName ?? "").isEmpty && !isAdopted }
+
     var isAdopted: Bool { status?.lowercased() == "adopted" }
     var isPending: Bool { status?.lowercased() == "pending" }
 

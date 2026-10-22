@@ -405,7 +405,7 @@ Estimates assume ~10–15 hours/week. Each phase ends with a demoable build. **R
 
 ### Added after the lister/real-chat refactor (Phases 17–20)
 
-These four phases were added once the app had two real personas (adopter, lister) on Firestore. Phases 17, 18 and 19 are **built** (not compiled yet); 20 is **planned, not built**. They are listed in the order to build them. The same scope rules apply: Firebase free (Spark) plan only, no server, no tests, no Storage (photos stay inline in Firestore), new access rules go in `firestore.rules` (and need re-publishing), and docs are updated per phase (Leftover.md, CLAUDE.md, Listers-and-Messaging.md). Phase 6 (Core ML) is still deferred, on purpose.
+These four phases were added once the app had two real personas (adopter, lister) on Firestore. Phases 17 to 20 are **built** (not compiled yet). They are listed in the order to build them. The same scope rules apply: Firebase free (Spark) plan only, no server, no tests, no Storage (photos stay inline in Firestore), new access rules go in `firestore.rules` (and need re-publishing), and docs are updated per phase (Leftover.md, CLAUDE.md, Listers-and-Messaging.md). Phase 6 (Core ML) is still deferred, on purpose.
 
 ### Phase 17: Meet & Greet Planner (MapKit) (~1 week) **(built; not compiled yet. See Leftover.md)**
 The app's one full MapKit feature. Today's map (`ShelterMapView`) only shows lister pins; this phase makes it do real work for both personas.
@@ -438,14 +438,14 @@ What happens after "adopted". Gives both personas a reason to come back.
 - [x] Rules: only the adopter and that listing's lister can read a journey; only the adopter can write updates; "Happy tails" updates are readable by everyone signed in
 - Out of scope: vet-record uploads, return/re-homing flow, video updates
 
-### Phase 20: Foster Volunteers (~1–1.5 weeks)
+### Phase 20: Foster Volunteers (~1–1.5 weeks) **(built; not compiled yet. See Leftover.md)**
 A third persona on the same login, alongside adopters and listers.
-- [ ] **Foster profile:** a "Become a foster" section in Profile (toggle `isFoster` on `users/{uid}`; fields: species and sizes you can take, how many animals, how long (days/weeks/open-ended), home type, other pets, experience, city and coordinates)
-- [ ] **Needs foster:** a lister can mark a listing as "Needs a foster" (new `fosterNeeded` flag, with a reason and duration). Shows as a badge on the pet card and detail screen and as a Discover filter
-- [ ] **Foster directory:** a list and a map layer (reuses Phase 17 map code) of volunteers near you, visible to listers only; fosters can hide themselves at any time
-- [ ] **Offer to foster:** a foster can message a lister about a "needs foster" listing (reuses chat) or send a short offer that the lister accepts or declines (small `fosterOffers/{id}` collection, with status updates and notifications)
-- [ ] When accepted, the listing shows "In foster care with <name>" (the foster's public name only, no address) until it is adopted
-- [ ] Rules: a foster's address is never public, only the city; lister-only directory reads; offers are readable by the two people involved
+- [x] **Foster profile:** a "Become a foster" section in Profile (toggle `isFoster` on `users/{uid}`; fields: species and sizes you can take, how many animals, how long (days/weeks/open-ended), home type, other pets, experience, city and coordinates)
+- [x] **Needs foster:** a lister can mark a listing as "Needs a foster" (new `fosterNeeded` flag, with a reason and duration). Shows as a badge on the pet card and detail screen and as a Discover filter
+- [x] **Foster directory:** a list and a map layer (reuses Phase 17 map code) of volunteers near you, visible to listers only; fosters can hide themselves at any time
+- [x] **Offer to foster:** a foster can message a lister about a "needs foster" listing (reuses chat) or send a short offer that the lister accepts or declines (small `fosterOffers/{id}` collection, with status updates and notifications)
+- [x] When accepted, the listing shows "In foster care with <name>" (the foster's public name only, no address) until it is adopted
+- [x] Rules: a foster's address is never public, only the city; lister-only directory reads; offers are readable by the two people involved
 - Out of scope: background checks, foster agreements and documents, supply or donation tracking, stipends
 
 ### Phase dependencies and order

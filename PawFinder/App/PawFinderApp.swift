@@ -17,6 +17,7 @@ struct PawFinderApp: App {
     @State private var careChecklists = CareChecklistStore()
     @State private var listings: ListingsService
     @State private var listerProfile = ListerProfileStore()
+    @State private var fosters = FosterStore()
     @AppStorage("appearance") private var appearance: AppearanceSetting = .system
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
@@ -53,6 +54,7 @@ struct PawFinderApp: App {
                     messages.start(for: userID)
                     applications.start(for: userID)
                     listerProfile.start(for: userID)
+                    fosters.start(for: userID)
                     listings.startMine(for: userID)
                 }
                 .environment(router)
@@ -65,6 +67,7 @@ struct PawFinderApp: App {
                 .environment(careChecklists)
                 .environment(listings)
                 .environment(listerProfile)
+                .environment(fosters)
                 // The number on the app icon: unread messages, new applications, changed favorites, new search matches.
                 .onChange(of: badgeCount, initial: true) { _, count in
                     NotificationManager.shared.updateBadge(count)
@@ -110,11 +113,13 @@ struct PawFinderApp: App {
         await NotificationManager.shared.notifySavedSearchMatches(matches)
         await messages.backgroundCheck()
         await applications.backgroundCheck()
+        await fosters.backgroundCheck()
         NotificationManager.shared.updateBadge(badgeCount)
     }
 
     private var badgeCount: Int {
         let changedFavorites = favorites.favorites.filter(\.statusChanged).count
-        return messages.unreadCount + applications.newReceivedCount + changedFavorites + savedSearches.newMatchTotal
+        return messages.unreadCount + applications.newReceivedCount + fosters.pendingReceivedCount
+            + changedFavorites + savedSearches.newMatchTotal
     }
 }

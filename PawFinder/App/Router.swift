@@ -57,6 +57,9 @@ enum Route: Hashable {
     case nearbyPlaces               // vets, pet stores, dog parks near you
     case listerReviews(id: String, name: String)   // a lister's reviews
     case journey(applicationID: String)            // after adoption: check-ins and photo updates
+    case fosterProfile                             // become / edit a foster volunteer profile
+    case fosterOffers                              // offers sent and received
+    case fosterDirectory                           // listers: volunteers nearby
     case help
     case about
     case privacyPolicy
@@ -114,6 +117,7 @@ final class Router {
     ///     pawfinder://conversation/<id>   a chat
     ///     pawfinder://received/<id>       an application you received (as a lister)
     ///     pawfinder://journey/<id>        an adoption journey (the application's ID)
+    ///     pawfinder://foster              foster offers
     ///     pawfinder://search/<uuid>  run a saved search in Discover
     ///     pawfinder://discover?species=dog&q=luna   Discover with filters
     ///     pawfinder://messages       the chats list
@@ -145,6 +149,8 @@ final class Router {
         case "journey":
             guard let argument else { return false }
             open(.journey(applicationID: argument), in: .profile)
+        case "foster":
+            open(.fosterOffers, in: .profile)
         case "search":
             guard let argument, let id = UUID(uuidString: argument) else { return false }
             selectedTab = .discover

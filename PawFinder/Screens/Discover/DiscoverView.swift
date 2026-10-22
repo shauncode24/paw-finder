@@ -314,6 +314,7 @@ struct DiscoverView: View {
         if filters.goodWithCats { chips.append(("Good with cats", { $0.goodWithCats = false })) }
         if filters.houseTrained { chips.append(("House-trained", { $0.houseTrained = false })) }
         if filters.specialNeeds { chips.append(("Special needs", { $0.specialNeeds = false })) }
+        if filters.needsFoster == true { chips.append(("Needs a foster", { $0.needsFoster = nil })) }
         for coat in PetFilters.Coat.allCases where filters.coats.contains(coat) {
             chips.append(("\(coat.rawValue) coat", { $0.coats.remove(coat) }))
         }

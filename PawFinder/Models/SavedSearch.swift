@@ -39,6 +39,7 @@ struct NotificationPreferences: Codable, Equatable {
         case applications = "Application updates"
         case messages = "Messages from shelters"
         case journey = "Adoption journey check-ins"
+        case foster = "Foster offers"
 
         var icon: String {
             switch self {
@@ -48,6 +49,7 @@ struct NotificationPreferences: Codable, Equatable {
             case .applications: "doc.text"
             case .messages: "bubble.left"
             case .journey: "heart.text.square"
+            case .foster: "house.and.flag"
             }
         }
     }

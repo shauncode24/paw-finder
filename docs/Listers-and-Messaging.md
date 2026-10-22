@@ -427,3 +427,68 @@ What happens after "adopted". The adopter gets a page for their new pet with tim
 - If the adopter deletes their account, their journey and any featured Happy tails stay (the adopter can switch sharing off first).
 - Happy tails are only visible to signed-in people (guests see no strip).
 - Photos live inside Firestore documents, so a very active journey uses storage on the free plan (about 100 KB per update).
+
+---
+
+## 18. Foster volunteers (Phase 20)
+
+A third role on the same login. A **foster volunteer** gives a pet a safe home for a few days or weeks until it is adopted. Listers can mark a pet as needing a foster, find volunteers nearby, and accept offers; volunteers can offer to help.
+
+### What the user sees
+| Where | What |
+|---|---|
+| **Profile › Fostering › Become a foster volunteer** | A form: available now (on/off), name, kinds of animals and sizes you can take, how many at a time, for how long (a few days / a few weeks / until adopted), home type, other pets, experience, a few words, and city/state/postcode. Your address is never asked for. |
+| **Listing form › Fostering** (lister) | **This pet needs a foster**, with an optional reason and how long. Once a volunteer is accepted this section reads "In foster care with <name>" with **End foster placement**. |
+| **Discover** | A "Needs a foster" badge on the pet's card, and a **Needs a foster** switch in the filters. |
+| **Pet page** | A banner ("Luna needs a foster home. <reason> · <how long>"), or "In foster care with <name>". Volunteers get **Offer to foster**, which asks for a foster profile first; listers get **Find foster volunteers**. |
+| **Offer sheet** | How long you can foster, an optional message (500 characters), **Send offer**. |
+| **Profile › Foster offers** | **Received** (lister): Accept / Decline / Message. **Sent** (volunteer): status, Withdraw, Message. The Profile tab badge counts new offers. |
+| **Profile › Foster volunteers nearby** (listers only) | Volunteers who are available, nearest first, as a list or on a map, with distance and animal chips. **Invite to foster** opens a chat about one of your pets that needs a foster. |
+| **Notifications** | A new switch, **Foster offers**: the lister is told about a new offer, the volunteer about the answer. |
+
+### How it is built
+- **`fosters/{uid}`** is the volunteer's profile: `displayName, isAvailable, species[], sizes[], capacity, duration, homeType, hasOtherPets, otherPetsNote, experience, bio, city, state, postcode, latitude, longitude`. It is a separate collection from `users/{uid}` (which anyone can read), so only the volunteer and listers can read it. The coordinates come from the city/postcode, so they are city-level. Listers see **first name and last initial** only.
+- **`fosterOffers/{listingID}_{volunteerID}`**: `listingID, listingName, listingSpecies, listerID, listerName, fosterID, fosterName, participants[], message, duration, status, createdAt, updatedAt`. `status` is `pending`, `accepted`, `declined` or `withdrawn`.
+- **Listing fields:** `fosterNeeded, fosterReason, fosterDuration` while a foster is wanted; `fosterByID, fosterByName` (the volunteer's public name) while one is placed. Accepting an offer sets the foster fields and clears `fosterNeeded` in the same batch as the offer's status. They stay until the lister ends the placement or the pet is adopted (adopted listings leave the feed).
+- **Chat is reused:** volunteers and listers talk in the normal chat about the pet (conversation `<listingID>_<volunteerID>`, with the volunteer in the "other person" role). Inviting from the directory opens that chat.
+- **The directory** reads the available volunteers (up to 300) and filters and sorts on the phone, so no index is needed.
+- **Security rules** (re-publish `firestore.rules`):
+  - A volunteer profile can only be read by its owner and by listers (users with a lister profile), and can only contain the fields above, so a street address can't be stored.
+  - An offer can only be created by the volunteer, for a listing that currently says it needs a foster, using the one-offer-per-pet ID. Only the lister and the volunteer can read it. The lister may then accept or decline, or the volunteer withdraw, once, while it's pending.
+
+### Files
+| New | Purpose |
+|---|---|
+| `Models/Foster.swift` | `FosterProfile`, `FosterDuration`, `FosterOffer`, `FosterOfferStatus` |
+| `Services/FosterStore.swift` | live profile and offers, save/remove profile, send/withdraw/accept/decline, end placement, directory, notifications |
+| `Screens/Foster/FosterProfileView.swift` | the volunteer form |
+| `Screens/Foster/FosterOffersView.swift` | offers list and `FosterOfferSheet` |
+| `Screens/Foster/FosterDirectoryView.swift` | directory (list and map), invite |
+
+| Changed | What |
+|---|---|
+| `Models/Pet.swift`, `Models/Listing.swift`, `Models/PetFilters.swift` | foster fields, filter |
+| `Screens/Lister/ListingFormView.swift` | Fostering section |
+| `Screens/Discover/PetCard.swift`, `FilterSheet.swift`, `DiscoverView.swift` | badge, filter, chip |
+| `Screens/PetDetail/PetDetailView.swift` | banners, Offer to foster, Find foster volunteers |
+| `Screens/Account/ProfileView.swift`, `AccountView.swift` | Fostering section; foster profile removed on account deletion |
+| `App/PawFinderApp.swift`, `App/RootView.swift` | `FosterStore` in the environment, badge, background check |
+| `Models/SavedSearch.swift`, `Services/NotificationManager.swift`, `Screens/Notifications/NotificationPrimingView.swift` | "Foster offers" category and notifications |
+| `App/Router.swift`, `Screens/PlaceholderScreens.swift` | routes `.fosterProfile`, `.fosterOffers`, `.fosterDirectory`; link `pawfinder://foster` |
+| `firestore.rules` | `fosters`, `fosterOffers` |
+
+### To try it
+1. Re-publish `firestore.rules`.
+2. Account A (lister): edit a listing, switch on **This pet needs a foster**, save. It now shows a badge in Discover.
+3. Account B: Profile › **Become a foster volunteer**, fill it in, save. Open A's pet and tap **Offer to foster**, then send.
+4. Account A: Profile › **Foster offers** shows it (and the Profile badge). Tap **Accept**. The pet now reads "In foster care with <B's name>".
+5. Account A: Profile › **Foster volunteers nearby** lists B (if A has a lister profile and B is within the distance chip). **Invite to foster** opens a chat.
+6. Account B: its offer shows **Accepted**. To end it, A edits the listing and taps **End foster placement**.
+
+### Limits
+- A foster profile is visible to **any** lister, and anyone can become one by saving a lister profile. There is no vetting, background check or foster agreement.
+- Coordinates are city-level, but they are stored precisely enough for a distance sort; the app never shows them to other users except as map pins at that city-level position.
+- Inviting a volunteer starts a chat; it is not an "offer" until the volunteer replies by sending one.
+- Other pending offers stay pending after one is accepted (the lister sees "already has a foster" and can decline them).
+- If a volunteer deletes their profile, offers they already sent stay.
+- Notifications are local: they appear while the app is open or after iOS's background refresh, not instantly.

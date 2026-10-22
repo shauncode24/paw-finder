@@ -14,6 +14,8 @@
 //   journeys/{applicationId}          an adoption journey: the adopter and the lister
 //   journeys/{id}/updates/*           its photo updates: read by both, written by the adopter
 //   happyTails/{updateId}             updates a lister features on their profile (signed-in people can read)
+//   fosters/{uid}            a foster volunteer's profile: the volunteer and signed-in listers only; no street address
+//   fosterOffers/{id}        an offer to foster a pet: the volunteer and the lister only
 //   reports/{id}             reports of listings or chats: anyone can send, nobody can read them in the app
 
 rules_version = '2';
@@ -195,6 +197,52 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if signedIn()
         && (resource.data.listerID == request.auth.uid || resource.data.adopterID == request.auth.uid);
+    }
+
+    // ---- Foster volunteers ----------------------------------------------------------------
+    // A lister is someone who has saved a lister profile (users/{uid}.isLister).
+    function isLister() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isLister', false) == true;
+    }
+
+    match /fosters/{uid} {
+      // Volunteers see their own profile; listers see the directory. Nobody else.
+      allow read: if signedIn() && (request.auth.uid == uid || isLister());
+      // Only these fields can be stored, so a street address can't end up here.
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly([
+             'displayName', 'isAvailable', 'species', 'sizes', 'capacity', 'duration', 'homeType',
+             'hasOtherPets', 'otherPetsNote', 'experience', 'bio', 'city', 'state', 'postcode',
+             'latitude', 'longitude', 'updatedAt'])
+        && request.resource.data.capacity is int
+        && request.resource.data.capacity >= 1 && request.resource.data.capacity <= 10;
+      allow delete: if signedIn() && request.auth.uid == uid;
+    }
+
+    // The offer's ID is "<listingID>_<volunteerID>": one offer per volunteer per pet.
+    match /fosterOffers/{offerId} {
+      // "resource == null" lets the app check whether an offer exists.
+      allow read: if signedIn() && (resource == null || request.auth.uid in resource.data.participants);
+      allow create: if signedIn()
+        && request.resource.data.fosterID == request.auth.uid
+        && request.resource.data.listerID != request.auth.uid
+        && request.resource.data.participants.size() == 2
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.listerID in request.resource.data.participants
+        && request.resource.data.status == 'pending'
+        && offerId == request.resource.data.listingID + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/fosters/$(request.auth.uid))
+        && get(/databases/$(database)/documents/listings/$(request.resource.data.listingID)).data.ownerID == request.resource.data.listerID
+        && get(/databases/$(database)/documents/listings/$(request.resource.data.listingID)).data.get('fosterNeeded', false) == true;
+      // The lister accepts or declines; the volunteer can withdraw. Only while it is still pending.
+      allow update: if signedIn()
+        && resource.data.status == 'pending'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && ((request.auth.uid == resource.data.listerID && request.resource.data.status in ['accepted', 'declined'])
+            || (request.auth.uid == resource.data.fosterID && request.resource.data.status == 'withdrawn'));
+      allow delete: if false;
     }
 
     // ---- Reports ------------------------------------------------------------------

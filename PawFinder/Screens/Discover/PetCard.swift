@@ -42,6 +42,9 @@ struct PetCard: View {
                         FavoriteButton(pet: pet, style: .overlay)
                     }
                 }
+                .overlay(alignment: .topLeading) {
+                    if pet.needsFoster { FosterBadge().padding(Spacing.sm) }
+                }
 
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(pet.name)
@@ -77,6 +80,18 @@ struct PetCard: View {
     }
 }
 
+/// "Needs a foster" tag on a pet's card.
+struct FosterBadge: View {
+    var body: some View {
+        Label("Needs a foster", systemImage: "house.and.flag.fill")
+            .font(.pfCaption.weight(.semibold))
+            .foregroundStyle(Color.pfSurfaceElevated)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, 3)
+            .background(Color.pfBrandPrimary, in: Capsule())
+    }
+}
+
 /// A list row: small photo on the left, details on the right (list layout).
 struct PetRow: View {
     let pet: Pet
@@ -100,6 +115,7 @@ struct PetRow: View {
                 Text(pet.summary)
                     .font(.pfCaption)
                     .foregroundStyle(Color.pfTextSecondary)
+                if pet.needsFoster { FosterBadge() }
             }
             Spacer(minLength: 0)
             if showsFavoriteButton {

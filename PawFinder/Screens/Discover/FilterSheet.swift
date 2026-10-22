@@ -64,6 +64,10 @@ struct FilterSheet: View {
                             Toggle("Cats", isOn: $draft.goodWithCats)
                             Toggle("House-trained", isOn: $draft.houseTrained)
                             Toggle("Special needs", isOn: $draft.specialNeeds)
+                            Toggle("Needs a foster", isOn: Binding(
+                                get: { draft.needsFoster == true },
+                                set: { draft.needsFoster = $0 ? true : nil }
+                            ))
                         }
                         .tint(Color.pfBrandPrimary)
                     }

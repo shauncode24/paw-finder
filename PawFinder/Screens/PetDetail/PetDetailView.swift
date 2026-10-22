@@ -15,6 +15,8 @@ struct PetDetailView: View {
     @Environment(AuthManager.self) private var auth
     @Environment(Router.self) private var router
     @Environment(MessagesStore.self) private var messages
+    @Environment(FosterStore.self) private var fosters
+    @State private var showFosterOffer = false
 
     private var pet: Pet { viewModel.pet }
 
@@ -38,6 +40,7 @@ struct PetDetailView: View {
 
                 VStack(alignment: .leading, spacing: Spacing.xl) {
                     statusBanner
+                    fosterBanner
                     header
                     if isMine {
                         ownerControls
@@ -45,6 +48,7 @@ struct PetDetailView: View {
                         applyButton
                         PFButton(title: "Message \(listerName ?? "the lister")", style: .secondary,
                                  isLoading: isOpeningChat) { openChat() }
+                        if pet.needsFoster { offerToFosterButton }
                     }
                     attributeChips
                     if favorites.isFavorite(pet.id) {
@@ -94,6 +98,9 @@ struct PetDetailView: View {
         }
         .sheet(isPresented: $showReport) {
             ReportListingSheet(pet: pet)
+        }
+        .sheet(isPresented: $showFosterOffer) {
+            FosterOfferSheet(pet: pet, listerName: listerName)
         }
         .task { await viewModel.load() }
         .alert("Couldn't open the chat", isPresented: Binding(get: { chatError != nil },
@@ -167,6 +174,9 @@ struct PetDetailView: View {
                     .foregroundStyle(Color.pfTextSecondary)
                 PFButton(title: "Edit listing") { router.push(.editListing(pet.id)) }
                 PFButton(title: "Applications received", style: .secondary) { router.push(.receivedApplications) }
+                if pet.needsFoster {
+                    PFButton(title: "Find foster volunteers", style: .secondary) { router.push(.fosterDirectory) }
+                }
             }
         }
     }
@@ -199,6 +209,37 @@ struct PetDetailView: View {
             banner("\(pet.name) has been adopted!", color: .pfSuccess)
         } else if pet.isPending {
             banner("Adoption pending: an application has been approved. Ask the lister if they're still looking.", color: .pfBrandPrimary)
+        }
+    }
+
+    /// "Needs a foster" (with the reason) or "In foster care with…".
+    @ViewBuilder
+    private var fosterBanner: some View {
+        if pet.isInFosterCare {
+            banner("In foster care with \(pet.fosterByName ?? "a volunteer"). Ask the lister to arrange a meeting.",
+                   color: .pfBrandPrimary)
+        } else if pet.needsFoster {
+            let detail: String = [pet.fosterReason, pet.fosterDuration].compactMap { $0 }.joined(separator: " · ")
+            banner(detail.isEmpty ? "\(pet.name) needs a foster home." : "\(pet.name) needs a foster home. \(detail)",
+                   color: .pfBrandPrimary)
+        }
+    }
+
+    /// Volunteers offer to foster; this asks for a foster profile first.
+    private var offerToFosterButton: some View {
+        PFButton(title: fosters.offer(forListing: pet.id) == nil ? "Offer to foster \(pet.name)" : "View your foster offer",
+                 style: .secondary) {
+            guard auth.user != nil else {
+                router.showSignIn = true
+                return
+            }
+            if fosters.offer(forListing: pet.id) != nil {
+                router.push(.fosterOffers)
+            } else if fosters.isFoster {
+                showFosterOffer = true
+            } else {
+                router.push(.fosterProfile)
+            }
         }
     }
 
@@ -375,5 +416,6 @@ struct PetDetailView: View {
     .environment(ApplicationsStore())
     .environment(Router())
     .environment(MessagesStore())
+    .environment(FosterStore())
     .environment(ListingsService())
 }

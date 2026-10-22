@@ -5,6 +5,7 @@ struct RootView: View {
     @Environment(Router.self) private var router
     @Environment(MessagesStore.self) private var messages
     @Environment(ApplicationsStore.self) private var applications
+    @Environment(FosterStore.self) private var fosters
 
     var body: some View {
         @Bindable var router = router
@@ -40,7 +41,7 @@ struct RootView: View {
     }
 
     private var profileBadge: Int {
-        messages.unreadCount + applications.newReceivedCount
+        messages.unreadCount + applications.newReceivedCount + fosters.pendingReceivedCount
     }
 }
 
@@ -55,6 +56,7 @@ struct RootView: View {
         .environment(ProfileStore())
         .environment(ApplicationsStore())
         .environment(MessagesStore())
+        .environment(FosterStore())
         .environment(NetworkMonitor())
         .environment(SavedSearchesStore())
 }

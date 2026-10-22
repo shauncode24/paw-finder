@@ -161,6 +161,23 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                       extraInfo: ["conversationID": conversationID])
     }
 
+    /// A lister received an offer to foster one of their pets.
+    func notifyNewFosterOffer(petName: String, from fosterName: String) async {
+        await deliver(.foster, id: "foster-offer-\(petName)-\(fosterName)",
+                      title: "Foster offer for \(petName)",
+                      body: "\(fosterName) would like to foster \(petName).",
+                      link: "pawfinder://foster")
+    }
+
+    /// A volunteer's offer was accepted or declined.
+    func notifyFosterOfferAnswer(petName: String, accepted: Bool) async {
+        await deliver(.foster, id: "foster-answer-\(petName)-\(accepted)",
+                      title: accepted ? "You're fostering \(petName)!" : "Update on your offer for \(petName)",
+                      body: accepted ? "The lister accepted your offer. Say hello in the chat."
+                                     : "The lister can't take your offer this time. Thank you for offering.",
+                      link: "pawfinder://foster")
+    }
+
     /// Reminders for the Week 1, Month 1 and Month 3 check-ins of an adoption journey.
     /// Reusing the same ID replaces the old reminder, so calling this again is safe.
     func scheduleJourneyReminders(applicationID: String, petName: String, adoptedAt: Date) async {

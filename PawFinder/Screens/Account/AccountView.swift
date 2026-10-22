@@ -101,6 +101,7 @@ struct AccountView: View {
     /// Chats and applications are kept, so the other person's history isn't broken.
     private func deleteOnlineData(userID: String) async {
         await listings.deleteAllMine()
+        try? await Firestore.firestore().collection("fosters").document(userID).delete()
         try? await Firestore.firestore().collection("users").document(userID).delete()
     }
 
