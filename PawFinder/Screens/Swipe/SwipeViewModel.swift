@@ -21,6 +21,8 @@ final class SwipeViewModel {
     private var page = 0
     private var hasMore = true
     private var passedIDs: Set<String>
+    /// After "Show passed pets again" the stack also includes pets already liked.
+    private var showEverything = false
 
     private static let passedKey = "swipePassedPetIDs"
     static let topPicksName = "Top picks"
@@ -50,9 +52,13 @@ final class SwipeViewModel {
                 page = result.currentPage
                 hasMore = result.hasMore
                 let shown = Set(queue.map(\.id))
-                queue += result.pets.filter {
-                    !passedIDs.contains($0.id) && !favorites.isFavorite($0.id) && !shown.contains($0.id)
+                let everything = showEverything
+                let fresh: [Pet] = result.pets.filter { pet in
+                    if shown.contains(pet.id) { return false }
+                    if everything { return true }
+                    return !passedIDs.contains(pet.id) && !favorites.isFavorite(pet.id)
                 }
+                queue += fresh
             } catch is CancellationError {
                 return
             } catch {
@@ -102,9 +108,13 @@ final class SwipeViewModel {
     func resetPassed() async {
         passedIDs = []
         savePassed()
+        showEverything = true      // pets you liked come back too, so the stack is never empty by surprise
+        queue = []
+        history = []
         page = 0
         hasMore = true
         reachedEnd = false
+        errorMessage = nil
     }
 
     private func savePassed() {

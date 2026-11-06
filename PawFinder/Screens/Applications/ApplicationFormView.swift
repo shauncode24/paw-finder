@@ -160,6 +160,12 @@ struct ApplicationFormView: View {
                     .font(.subheadline)
                     .foregroundStyle(Color.pfTextSecondary)
             }
+            if isSubmitting {
+                Label("Sending to the lister. This can take up to 10 seconds; if it can't connect you'll see a message here.",
+                      systemImage: "paperplane")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.pfTextSecondary)
+            }
             HStack(spacing: Spacing.md) {
                 if step != .aboutYou {
                     PFButton(title: "Back", style: .secondary) { move(by: -1) }

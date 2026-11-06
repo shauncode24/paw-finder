@@ -27,6 +27,7 @@ struct SettingsView: View {
     @State private var notificationStatus: UNAuthorizationStatus = .notDetermined
     @State private var confirmation: String?
     @State private var confirmErase = false
+    @State private var showConnectionCheck = false
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = true
 
     @Environment(FavoritesStore.self) private var favorites
@@ -88,6 +89,18 @@ struct SettingsView: View {
                 Text("Notifications tell you when a favorite gets adopted. Location finds pets near you.")
             }
 
+            Section {
+                Button {
+                    showConnectionCheck = true
+                } label: {
+                    Label("Check connection", systemImage: "wifi.exclamationmark")
+                }
+            } header: {
+                Text("Troubleshooting")
+            } footer: {
+                Text("Use this if listings, the map, messages or applications won't load.")
+            }
+
             Section("Data") {
                 Button("Clear recently viewed", role: .destructive) {
                     recentlyViewed.clear()
@@ -129,6 +142,7 @@ struct SettingsView: View {
         .background(Color.pfBackground)
         .navigationTitle("Settings")
         .task { await refreshNotificationStatus() }
+        .sheet(isPresented: $showConnectionCheck) { ConnectionCheckView() }
         .confirmationDialog("Erase all PawFinder data on this phone?", isPresented: $confirmErase,
                             titleVisibility: .visible) {
             Button("Erase everything", role: .destructive) { eraseAll() }

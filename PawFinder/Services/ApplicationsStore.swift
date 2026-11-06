@@ -255,7 +255,7 @@ final class ApplicationsStore {
 
         let reference = db.collection("applications").document(id.uuidString)
         do {
-            try await withNetworkTimeout { try await reference.setData(data) }
+            try await withNetworkTimeout(seconds: 10) { try await reference.setData(data) }
         } catch {
             // Say what to check, since "offline" and "no permission" are usually setup problems here.
             let friendly = backendError(error)

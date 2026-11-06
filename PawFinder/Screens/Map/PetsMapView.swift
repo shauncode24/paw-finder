@@ -43,12 +43,15 @@ struct PetsMapView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var visibleRegion: MKCoordinateRegion?
     @State private var center: CLLocationCoordinate2D?
-    @State private var radius = 25
+    /// Starts on "Any distance": a circle around the phone's location (the
+    /// Simulator's is in California) would otherwise hide every pet.
+    @State private var radius = 0
     @State private var species: String?
     @State private var placeText = ""
     @State private var selectedID: String?
     @State private var stack: PetCluster?
     @State private var message: String?
+    @State private var resolved: [String: CLLocationCoordinate2D] = [:]
 
     /// Miles; 0 means "any distance".
     private static let radiusOptions = [10, 25, 50, 100, 0]
@@ -56,8 +59,37 @@ struct PetsMapView: View {
 
     // MARK: - Data
 
+    /// Pets with a position: the one saved with the listing, or one looked up on
+    /// this phone from the listing's city/postcode (older listings, or listings
+    /// posted while the geocoder was unreachable, have none saved).
     private var withLocation: [Pet] {
-        listings.listings.filter { $0.latitude != nil && $0.longitude != nil }
+        listings.listings.compactMap { pet -> Pet? in
+            if pet.latitude != nil, pet.longitude != nil { return pet }
+            guard let found = resolved[pet.id] else { return nil }
+            var copy: Pet = pet
+            copy.latitude = found.latitude
+            copy.longitude = found.longitude
+            return copy
+        }
+    }
+
+    /// Looks up positions for pets that have none, one place name at a time
+    /// (the geocoder is rate-limited, and answers are remembered).
+    private func resolveMissingLocations() async {
+        let missing: [Pet] = listings.listings.filter {
+            ($0.latitude == nil || $0.longitude == nil) && resolved[$0.id] == nil
+        }
+        var tried = Set<String>()
+        for pet in missing.prefix(40) {
+            if Task.isCancelled { return }
+            let text: String = pet.location.trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty, !tried.contains(text) else { continue }
+            tried.insert(text)
+            guard let coordinate = await ShelterGeocoder.shared.coordinate(forLocationText: text) else { continue }
+            for sibling in missing where sibling.location.trimmingCharacters(in: .whitespaces) == text {
+                resolved[sibling.id] = coordinate
+            }
+        }
     }
 
     private func miles(from center: CLLocationCoordinate2D, to pet: Pet) -> Double? {
@@ -90,6 +122,9 @@ struct PetsMapView: View {
             .safeAreaInset(edge: .top) { topBar }
             .safeAreaInset(edge: .bottom) { bottomPanel }
             .sheet(item: $stack) { cluster in stackSheet(cluster) }
+            .task(id: listings.revision) {
+                await resolveMissingLocations()
+            }
             .task {
                 let status = locationService.authorizationStatus
                 if center == nil, status == .authorizedWhenInUse || status == .authorizedAlways {
@@ -227,8 +262,13 @@ struct PetsMapView: View {
     }
 
     private var summary: String {
-        if !listings.isReady { return "Loading pets..." }
+        if let problem = listings.loadError { return problem }
+        if !listings.isReady { return "Loading pets... If this stays, open Settings › Check connection." }
+        if listings.listings.isEmpty { return "No pets are listed yet. Post one from Profile › List a pet." }
         let count: Int = visiblePets.count
+        if count == 0, !withLocation.isEmpty {
+            return "No pets inside this circle. Pick a bigger distance or \"Any distance\"."
+        }
         var text: String = count == 1 ? "1 pet on the map" : "\(count) pets on the map"
         let hidden: Int = listings.listings.count - withLocation.count
         if hidden > 0 { text += " · \(hidden) without a location" }
