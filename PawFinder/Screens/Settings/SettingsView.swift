@@ -28,6 +28,9 @@ struct SettingsView: View {
     @State private var confirmation: String?
     @State private var confirmErase = false
     @State private var showConnectionCheck = false
+    @State private var isSeeding = false
+    @Environment(ListingsService.self) private var listings
+    @Environment(ListerProfileStore.self) private var listerStore
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = true
 
     @Environment(FavoritesStore.self) private var favorites
@@ -95,10 +98,19 @@ struct SettingsView: View {
                 } label: {
                     Label("Check connection", systemImage: "wifi.exclamationmark")
                 }
+                Button {
+                    Task { await addSamplePets() }
+                } label: {
+                    HStack {
+                        Label("Add 12 sample pets", systemImage: "pawprint")
+                        if isSeeding { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(isSeeding)
             } header: {
                 Text("Troubleshooting")
             } footer: {
-                Text("Use this if listings, the map, messages or applications won't load.")
+                Text("Check connection: use it if listings, the map, messages or applications won't load. Sample pets: made-up listings for demos. They need a lister profile (Profile › List a pet) and take about a minute.")
             }
 
             Section("Data") {
@@ -170,6 +182,23 @@ struct SettingsView: View {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         NotificationManager.shared.updateBadge(0)
         confirmation = "All PawFinder data on this phone was erased."
+    }
+
+    private func addSamplePets() async {
+        guard let owner = listerStore.profile, owner.isLister else {
+            confirmation = "Sign in and set up a lister profile first (Profile › List a pet for adoption), then come back."
+            return
+        }
+        isSeeding = true
+        defer { isSeeding = false }
+        let result = await SamplePets.add(using: listings, owner: owner)
+        if let problem = result.problem {
+            confirmation = "Added \(result.added) before an error: \(problem)"
+        } else if result.added == 0 {
+            confirmation = "The sample pets are already in your listings."
+        } else {
+            confirmation = "Added \(result.added) sample pets. They appear in Discover, Swipe and the Map within a few seconds."
+        }
     }
 
     private func refreshNotificationStatus() async {
