@@ -11,8 +11,40 @@ enum BreedCatalog {
         case .cat: cats
         case .rabbit: rabbits
         case .bird: birds
+        case .guineaPig: guineaPigs
+        case .hamster: hamsters
+        case .ferret: ["Standard", "Angora", mixed]
+        case .horse: horses
+        case .reptile: reptiles
+        case .fish: fish
+        case .farmAnimal: farmAnimals
+        case .other: []
         }
     }
+
+    static let guineaPigs: [String] = [
+        "Abyssinian", "American", "Peruvian", "Silkie", "Skinny Pig", "Teddy", "Texel", mixed,
+    ]
+
+    static let hamsters: [String] = [
+        "Chinese", "Dwarf Campbell's", "Roborovski", "Syrian", "Winter White", mixed,
+    ]
+
+    static let horses: [String] = [
+        "Arabian", "Kathiawari", "Marwari", "Pony", "Quarter Horse", "Thoroughbred", mixed,
+    ]
+
+    static let reptiles: [String] = [
+        "Ball Python", "Bearded Dragon", "Corn Snake", "Iguana", "Leopard Gecko", "Red-eared Slider", "Tortoise", "Other",
+    ]
+
+    static let fish: [String] = [
+        "Angelfish", "Betta", "Goldfish", "Guppy", "Koi", "Other",
+    ]
+
+    static let farmAnimals: [String] = [
+        "Chicken", "Cow", "Duck", "Goat", "Pig", "Sheep", "Other",
+    ]
 
     /// Breeds containing what was typed (starting-with matches first).
     static func suggestions(for species: PetFilters.Species, matching text: String, limit: Int = 6) -> [String] {

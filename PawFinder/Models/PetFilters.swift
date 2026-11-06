@@ -22,8 +22,22 @@ struct PetFilters: Codable, Hashable {
     var shelterID: String?           // only this lister's pets (lister profile)
     var needsFoster: Bool?           // true = only pets that need a foster (nil keeps old saved filters readable)
 
+    /// The kinds of animal in the pickers. "Other" lets a lister type their own
+    /// (it is stored as that text, e.g. "Tortoise", and found again by the Other filter).
     enum Species: String, Codable, CaseIterable {
         case dog = "Dog", cat = "Cat", rabbit = "Rabbit", bird = "Bird"
+        case guineaPig = "Guinea Pig", hamster = "Hamster", ferret = "Ferret"
+        case horse = "Horse", reptile = "Reptile", fish = "Fish", farmAnimal = "Farm Animal"
+        case other = "Other"
+
+        /// Does a pet whose stored species text is `stored` belong to this kind?
+        func matches(_ stored: String) -> Bool {
+            if self == .other {
+                let known = Species(rawValue: stored)
+                return known == nil || known == .other
+            }
+            return stored == rawValue
+        }
     }
 
     enum Age: String, Codable, CaseIterable {

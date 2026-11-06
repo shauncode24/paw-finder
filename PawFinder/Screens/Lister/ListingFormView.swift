@@ -137,10 +137,14 @@ struct ListingFormView: View {
     private var basicsSection: some View {
         Section("The basics") {
             TextField("Name", text: $draft.name)
-            Picker("Species", selection: $draft.species) {
+            Picker("Kind of animal", selection: $draft.species) {
                 ForEach(PetFilters.Species.allCases, id: \.self) { Text($0.rawValue).tag($0) }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
+            if draft.species == .other {
+                TextField("What kind of animal? e.g. Tortoise, Hedgehog", text: $draft.customSpecies)
+                    .textInputAutocapitalization(.words)
+            }
 
             TextField("Breed", text: $draft.breed)
                 .autocorrectionDisabled()

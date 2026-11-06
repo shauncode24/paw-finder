@@ -55,7 +55,7 @@ struct PetsMapView: View {
 
     /// Miles; 0 means "any distance".
     private static let radiusOptions = [10, 25, 50, 100, 0]
-    private static let speciesOptions = ["Dog", "Cat", "Rabbit", "Bird"]
+    private static let speciesOptions: [String] = PetFilters.Species.allCases.map(\.rawValue)
 
     // MARK: - Data
 
@@ -101,7 +101,7 @@ struct PetsMapView: View {
     /// Pets that pass the species chip and the distance circle.
     private var visiblePets: [Pet] {
         withLocation.filter { pet in
-            if let species, pet.species != species { return false }
+            if let species, let kind = PetFilters.Species(rawValue: species), !kind.matches(pet.species) { return false }
             if let center, radius > 0, let distance = miles(from: center, to: pet) {
                 return distance <= Double(radius)
             }

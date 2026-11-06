@@ -68,6 +68,8 @@ struct ListingDraft: Equatable {
     // Basics
     var name = ""
     var species: PetFilters.Species = .dog
+    /// Used when `species` is Other: what the animal is, in the lister's words.
+    var customSpecies = ""
     var breed = ""
     var secondaryBreed = ""
     var isMixed = false
@@ -130,6 +132,9 @@ struct ListingDraft: Equatable {
     var problems: [String] {
         var found: [String] = []
         if name.trimmingCharacters(in: .whitespaces).isEmpty { found.append("Give the pet a name.") }
+        if species == .other, customSpecies.trimmingCharacters(in: .whitespaces).isEmpty {
+            found.append("Say what kind of animal it is (for example Tortoise).")
+        }
         if breed.trimmingCharacters(in: .whitespaces).isEmpty { found.append("Choose a breed (or \"Mixed Breed\").") }
         if photos.isEmpty { found.append("Add at least one photo.") }
         if description.trimmingCharacters(in: .whitespacesAndNewlines).count < 30 {
@@ -143,6 +148,13 @@ struct ListingDraft: Equatable {
             found.append("The video link should start with http:// or https://.")
         }
         return found
+    }
+
+    /// What is stored as the species: the chosen kind, or the lister's own words for Other.
+    var speciesText: String {
+        guard species == .other else { return species.rawValue }
+        let custom = customSpecies.trimmingCharacters(in: .whitespaces)
+        return custom.isEmpty ? PetFilters.Species.other.rawValue : String(custom.prefix(30))
     }
 
     /// The fee as a number (nil when blank or not a number).
@@ -246,7 +258,15 @@ enum ListingMapper {
         draft.createdAt = (d["createdAt"] as? Timestamp)?.dateValue()
         draft.originalPhotoCount = (d["photoCount"] as? Int) ?? 0
         draft.name = (d["name"] as? String) ?? ""
-        draft.species = PetFilters.Species(rawValue: (d["species"] as? String) ?? "") ?? .dog
+        let storedSpecies: String = (d["species"] as? String) ?? ""
+        if let known = PetFilters.Species(rawValue: storedSpecies) {
+            draft.species = known
+        } else if storedSpecies.isEmpty {
+            draft.species = .dog
+        } else {
+            draft.species = .other                 // a custom kind, like "Tortoise"
+            draft.customSpecies = storedSpecies
+        }
         draft.breed = (d["breed"] as? String) ?? ""
         draft.secondaryBreed = (d["secondaryBreed"] as? String) ?? ""
         draft.isMixed = (d["mixed"] as? Bool) ?? false
@@ -298,7 +318,7 @@ enum ListingMapper {
             "ownerID": ownerID,
             "ownerName": ownerName,
             "name": trimmed(draft.name),
-            "species": draft.species.rawValue,
+            "species": draft.speciesText,
             "breed": trimmed(draft.breed),
             "mixed": draft.isMixed || !trimmed(draft.secondaryBreed).isEmpty,
             "age": draft.age.rawValue,
@@ -404,7 +424,7 @@ extension PetFilters {
         if !query.isEmpty, !matchesQuery(query, pet) {
             return false
         }
-        if let species, pet.species != species.rawValue { return false }
+        if let species, !species.matches(pet.species) { return false }
         if let breed, !pet.breed.localizedCaseInsensitiveContains(breed) { return false }
         if let shelterID, pet.shelterID != shelterID { return false }
         if !ages.isEmpty, !ages.map(\.rawValue).contains(pet.age) { return false }

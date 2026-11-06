@@ -15,13 +15,27 @@ struct PetPhoto: View {
             } else {
                 ZStack {
                     Color.pfBrandDeep
-                    Image(systemName: species == "Cat" ? "cat.fill" : "pawprint.fill")
+                    Image(systemName: Self.symbol(for: species))
                         .font(.largeTitle)
                         .foregroundStyle(Color.pfBrandLight)
                 }
             }
         }
         .accessibilityHidden(true)
+    }
+
+    /// The icon shown while a photo loads (or when there isn't one).
+    static func symbol(for species: String) -> String {
+        switch species {
+        case "Cat": "cat.fill"
+        case "Dog": "dog.fill"
+        case "Bird": "bird.fill"
+        case "Rabbit", "Guinea Pig", "Hamster", "Ferret": "hare.fill"
+        case "Reptile": "lizard.fill"
+        case "Fish": "fish.fill"
+        case "Horse": "figure.equestrian.sports"
+        default: "pawprint.fill"
+        }
     }
 }
 

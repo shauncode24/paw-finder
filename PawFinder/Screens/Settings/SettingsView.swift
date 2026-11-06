@@ -102,7 +102,7 @@ struct SettingsView: View {
                     Task { await addSamplePets() }
                 } label: {
                     HStack {
-                        Label("Add 12 sample pets", systemImage: "pawprint")
+                        Label("Add 15 sample pets", systemImage: "pawprint")
                         if isSeeding { Spacer(); ProgressView() }
                     }
                 }
@@ -110,7 +110,7 @@ struct SettingsView: View {
             } header: {
                 Text("Troubleshooting")
             } footer: {
-                Text("Check connection: use it if listings, the map, messages or applications won't load. Sample pets: made-up listings for demos. They need a lister profile (Profile › List a pet) and take about a minute.")
+                Text("Check connection: use it if listings, the map, messages or applications won't load. Sample pets: made-up listings with real animal photos downloaded from the internet. They need a lister profile (Profile › List a pet) and take a minute or two.")
             }
 
             Section("Data") {
@@ -197,7 +197,11 @@ struct SettingsView: View {
         } else if result.added == 0 {
             confirmation = "The sample pets are already in your listings."
         } else {
-            confirmation = "Added \(result.added) sample pets. They appear in Discover, Swipe and the Map within a few seconds."
+            var text = "Added \(result.added) sample pets. They appear in Discover, Swipe and the Map within a few seconds."
+            if result.withoutRealPhoto > 0 {
+                text += " \(result.withoutRealPhoto) could not download a real photo (no internet or the picture service was down) and use a plain card."
+            }
+            confirmation = text
         }
     }
 
